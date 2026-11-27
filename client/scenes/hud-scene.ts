@@ -16,6 +16,7 @@ interface HudData {
 
 export class HudScene extends Phaser.Scene {
   private hpBar!: Phaser.GameObjects.Graphics;
+  private hpText!: Phaser.GameObjects.Text;
   private quiverDisplay!: Phaser.GameObjects.Graphics;
   private quiverText!: Phaser.GameObjects.Text;
   private abilitySlots: Phaser.GameObjects.Container[] = [];
@@ -30,6 +31,10 @@ export class HudScene extends Phaser.Scene {
   create(): void {
     // HP bar background + fill
     this.hpBar = this.add.graphics().setDepth(100);
+    this.hpText = this.add.text(120, 24, '', {
+      fontFamily: '"Cinzel", serif', fontSize: '13px', color: '#ffffff',
+      stroke: '#000000', strokeThickness: 2,
+    }).setOrigin(0.5, 0).setDepth(101);
 
     // Quiver display
     this.quiverDisplay = this.add.graphics().setDepth(100);
@@ -96,8 +101,8 @@ export class HudScene extends Phaser.Scene {
     // Border
     this.hpBar.lineStyle(1, 0xffffff, 0.15);
     this.hpBar.strokeRoundedRect(x, y, w, h, r);
-    // Text
-    this.hpBar.fillStyle(0xffffff, 0.9);
+    // HP text
+    this.hpText.setText(`${Math.ceil(hp)} / ${maxHp}`);
   }
 
   private drawQuiver(quiver: QuiverState, time: number): void {

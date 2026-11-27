@@ -98,6 +98,9 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.setDeadzone(100, 80);
     this.cameras.main.setBackgroundColor(PALETTE.bg);
 
+    // Custom crosshair cursor
+    this.input.setDefaultCursor('crosshair');
+
     // Groups
     this.enemies = this.physics.add.group();
     this.arrows = this.physics.add.group();
@@ -499,6 +502,10 @@ export class GameScene extends Phaser.Scene {
   private killEnemy(enemy: Phaser.Physics.Arcade.Sprite, data: EnemyData): void {
     this.kills++;
     this.enemiesAlive--;
+
+    // Hit-stop: brief time scale reduction for satisfying kills
+    this.time.timeScale = 0.3;
+    this.time.delayedCall(60, () => { this.time.timeScale = 1; });
 
     // Gold drop
     const goldDrop = data.type === 'brute' ? 5 : 2;
