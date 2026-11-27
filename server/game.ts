@@ -2,7 +2,8 @@ import { Router } from 'express';
 import jwt from 'jsonwebtoken';
 import { ObjectId } from 'mongodb';
 import { getDB } from './db';
-import { masteryXpRequired } from '../shared/types';
+import { masteryXpRequired, levelFromXp, MASTERY_SKILL_GATES } from '../shared/types';
+import type { ClassId } from '../shared/types';
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
@@ -45,31 +46,50 @@ router.post('/save-run', async (req, res) => {
       masteryUps++;
     }
 
+    // ── Auto-unlock mastery-gated skills ──
+    const gates = MASTERY_SKILL_GATES[classId as ClassId] ?? [];
+    const alreadyUnlocked = new Set(classProgress?.unlockedAbilities ?? []);
+    const newlyUnlocked: string[] = [];
+    for (const gate of gates) {
+      if (currentMastery >= gate.masteryRequired && !alreadyUnlocked.has(gate.abilityId)) {
+        newlyUnlocked.push(gate.abilityId);
+      }
+    }
+
     // ── Class level (separate from mastery) ──
     const classLevel = Math.floor(Math.sqrt(currentClassXp / 100)) + 1;
 
     // Update player
+    const updateOps: any = {
+      $inc: {
+        xp: xpEarned,
+        gold: gold,
+      },
+      $set: {
+        [`classProgress.${classId}.xp`]: currentClassXp,
+        [`classProgress.${classId}.mastery`]: currentMastery,
+        [`classProgress.${classId}.level`]: classLevel,
+      },
+    };
+    // Add mastery-gated skills
+    if (newlyUnlocked.length > 0) {
+      updateOps.$addToSet = {
+        [`classProgress.${classId}.unlockedAbilities`]: { $each: newlyUnlocked },
+      };
+    }
+
     const result = await db.collection('players').findOneAndUpdate(
       { _id: new ObjectId(playerId) },
-      {
-        $inc: {
-          xp: xpEarned,
-          gold: gold,
-        },
-        $set: {
-          [`classProgress.${classId}.xp`]: currentClassXp,
-          [`classProgress.${classId}.mastery`]: currentMastery,
-          [`classProgress.${classId}.level`]: classLevel,
-        },
-      },
+      updateOps,
       { returnDocument: 'after' },
     );
 
     if (!result) { res.status(404).json({ error: 'Erro ao atualizar' }); return; }
 
-    // Global level
-    const totalXp = result.xp;
-    const newLevel = Math.floor(Math.sqrt(totalXp / 100)) + 1;
+    // Global level (harder, separate from mastery)
+    const totalXp = (player.xp ?? 0) + xpEarned;
+    const globalLvl = levelFromXp(totalXp);
+    const newLevel = globalLvl.level;
     if (newLevel > result.level) {
       await db.collection('players').updateOne(
         { _id: new ObjectId(playerId) },

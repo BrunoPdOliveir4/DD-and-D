@@ -81,7 +81,103 @@ export interface ClassProgress {
   equippedAbilities: string[]; // 5 equipped ability IDs
 }
 
+// ── Global player level (separate from mastery, harder to level) ──
+
+/** XP needed for global player level. Much harder than mastery. */
+export function globalLevelXpRequired(currentLevel: number): number {
+  // Level 1→2: 1000, then +500 per level + cubic scaling
+  return 1000 + (currentLevel - 1) * 500 + Math.floor(Math.pow(currentLevel - 1, 2.5) * 20);
+}
+
+/** Total XP needed from 0 to reach a given level */
+export function totalXpForLevel(level: number): number {
+  let total = 0;
+  for (let i = 1; i < level; i++) {
+    total += globalLevelXpRequired(i);
+  }
+  return total;
+}
+
+/** Calculate level from total XP */
+export function levelFromXp(totalXp: number): { level: number; currentLevelXp: number; nextLevelXp: number } {
+  let level = 1;
+  let remaining = totalXp;
+  while (true) {
+    const needed = globalLevelXpRequired(level);
+    if (remaining < needed) {
+      return { level, currentLevelXp: remaining, nextLevelXp: needed };
+    }
+    remaining -= needed;
+    level++;
+  }
+}
+
 // ── Mastery system (infinite progression) ──
+
+// Mastery tier names and colors
+export interface MasteryTier {
+  name: string;
+  minMastery: number;
+  color: number;
+  borderStyle: 'none' | 'bronze' | 'silver' | 'gold' | 'diamond' | 'master' | 'grandmaster';
+}
+
+export const MASTERY_TIERS: MasteryTier[] = [
+  { name: 'Sem Faixa',  minMastery: 0,  color: 0x555555, borderStyle: 'none' },
+  { name: 'Bronze',     minMastery: 1,  color: 0xcd7f32, borderStyle: 'bronze' },
+  { name: 'Prata',      minMastery: 3,  color: 0xc0c0c0, borderStyle: 'silver' },
+  { name: 'Ouro',       minMastery: 5,  color: 0xffd700, borderStyle: 'gold' },
+  { name: 'Diamante',   minMastery: 10, color: 0x00d4ff, borderStyle: 'diamond' },
+  { name: 'Mestre',     minMastery: 20, color: 0xff4500, borderStyle: 'master' },
+  { name: 'Grão-Mestre', minMastery: 50, color: 0xff00ff, borderStyle: 'grandmaster' },
+];
+
+export function getMasteryTier(mastery: number): MasteryTier {
+  let tier = MASTERY_TIERS[0];
+  for (const t of MASTERY_TIERS) {
+    if (mastery >= t.minMastery) tier = t;
+  }
+  return tier;
+}
+
+// Mastery-gated skills: 5 per class, unlocked at mastery milestones
+export const MASTERY_SKILL_GATES: Record<ClassId, { abilityId: string; masteryRequired: number }[]> = {
+  hunter: [
+    { abilityId: 'hnt_quick_reload', masteryRequired: 2 },
+    { abilityId: 'hnt_eagle_eye', masteryRequired: 5 },
+    { abilityId: 'hnt_prey_mark', masteryRequired: 8 },
+    { abilityId: 'hnt_arrow_storm', masteryRequired: 12 },
+    { abilityId: 'hnt_wild_instinct', masteryRequired: 20 },
+  ],
+  berserker: [
+    { abilityId: 'bsk_axe_throw', masteryRequired: 2 },
+    { abilityId: 'bsk_bloodlust', masteryRequired: 5 },
+    { abilityId: 'bsk_whirlwind', masteryRequired: 8 },
+    { abilityId: 'bsk_iron_skin', masteryRequired: 12 },
+    { abilityId: 'bsk_avatar_of_war', masteryRequired: 20 },
+  ],
+  runekeeper: [
+    { abilityId: 'rk_arcane_bolt', masteryRequired: 2 },
+    { abilityId: 'rk_rune_shield', masteryRequired: 5 },
+    { abilityId: 'rk_chain_lightning', masteryRequired: 8 },
+    { abilityId: 'rk_summon_golem', masteryRequired: 12 },
+    { abilityId: 'rk_arcane_singularity', masteryRequired: 20 },
+  ],
+  riftblade: [
+    { abilityId: 'rb_shadow_blade', masteryRequired: 2 },
+    { abilityId: 'rb_phase_shift', masteryRequired: 5 },
+    { abilityId: 'rb_void_eruption', masteryRequired: 8 },
+    { abilityId: 'rb_clone_assault', masteryRequired: 12 },
+    { abilityId: 'rb_reality_shatter', masteryRequired: 20 },
+  ],
+  trickster: [
+    { abilityId: 'tk_poison_flask', masteryRequired: 2 },
+    { abilityId: 'tk_vanish', masteryRequired: 5 },
+    { abilityId: 'tk_card_trick', masteryRequired: 8 },
+    { abilityId: 'tk_hall_of_mirrors', masteryRequired: 12 },
+    { abilityId: 'tk_curtain_call', masteryRequired: 20 },
+  ],
+};
 
 /** XP needed to reach a mastery level. Scales infinitely. */
 export function masteryXpRequired(currentMastery: number): number {
