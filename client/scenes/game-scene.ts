@@ -9,6 +9,7 @@ import {
   createQuiver, currentArrow, fireArrow, tickReload, reloadProgress,
   ARROW_DAMAGE, ARROW_SPEED, type ArrowType, type QuiverState, ARROW_COLORS,
 } from '../systems/quiver';
+import { saveRun } from '../services/game-api';
 import { buildWave, randomEdgePosition } from '../systems/wave-manager';
 
 // ── Ability definitions (3 starter abilities) ──
@@ -680,27 +681,43 @@ export class GameScene extends Phaser.Scene {
     this.player.setTint(0x666666);
     (this.player.body as Phaser.Physics.Arcade.Body).setVelocity(0, 0);
 
+    // Save run to server
+    saveRun(this.wave, this.kills, this.gold, 'hunter').then(result => {
+      this.showGameOverUI(result.xpEarned, result.newLevel);
+    }).catch(() => {
+      this.showGameOverUI(0, 0);
+    });
+  }
+
+  private showGameOverUI(xpEarned: number, newLevel: number): void {
     const overlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.7)
       .setScrollFactor(0).setDepth(100);
     overlay.setAlpha(0);
     this.tweens.add({ targets: overlay, alpha: 1, duration: 500 });
 
     this.time.delayedCall(500, () => {
-      this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 60, 'DERROTADO', {
+      this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 80, 'DERROTADO', {
         fontFamily: '"Cinzel", serif', fontSize: '48px', color: '#e74c3c', fontStyle: 'bold',
         stroke: '#000000', strokeThickness: 6,
       }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
 
-      this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 10, [
-        `Onda: ${this.wave}`,
-        `Kills: ${this.kills}`,
-        `Ouro: 🪙 ${this.gold}`,
+      this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 15, [
+        `⚔️ Onda ${this.wave}`,
+        `💀 ${this.kills} kills`,
+        `🪙 ${this.gold} ouro`,
       ].join('  ·  '), {
         fontFamily: '"Cinzel", serif', fontSize: '18px', color: '#d4d4d8',
         stroke: '#000000', strokeThickness: 3,
       }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
 
-      const btn = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 70, '[ MENU ]', {
+      if (xpEarned > 0) {
+        this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 25, `+${xpEarned} XP${newLevel > 0 ? `  ·  Nível ${newLevel}` : ''}`, {
+          fontFamily: '"Cinzel", serif', fontSize: '16px', color: '#c9a44e',
+          stroke: '#000000', strokeThickness: 3,
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
+      }
+
+      const btn = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 80, '[ MENU ]', {
         fontFamily: '"Cinzel", serif', fontSize: '22px', color: '#c9a44e', fontStyle: 'bold',
       }).setOrigin(0.5).setScrollFactor(0).setDepth(101).setInteractive({ useHandCursor: true });
       btn.on('pointerdown', () => {

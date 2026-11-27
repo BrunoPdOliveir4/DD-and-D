@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { connectDB } from './db';
 import authRouter from './auth';
+import gameRouter from './game';
 
 dotenv.config();
 
@@ -17,6 +18,7 @@ async function main() {
 
   // Routes
   app.use('/api/auth', authRouter);
+  app.use('/api/game', gameRouter);
 
   // Health check
   app.get('/api/health', (_req, res) => {
