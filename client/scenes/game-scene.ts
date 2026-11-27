@@ -305,10 +305,10 @@ export class GameScene extends Phaser.Scene {
       const arrow = this.physics.add.sprite(this.player.x, this.player.y, texKey);
       arrow.setRotation(angle);
       arrow.setData('type', type);
+      this.arrows.add(arrow);
       (arrow.body as Phaser.Physics.Arcade.Body).setVelocity(
         Math.cos(angle) * ARROW_SPEED, Math.sin(angle) * ARROW_SPEED,
       );
-      this.arrows.add(arrow);
       this.quiver = fireArrow(this.quiver, now);
       return;
     }
@@ -361,11 +361,11 @@ export class GameScene extends Phaser.Scene {
       arrow.setRotation(angle);
       arrow.setData('type', 'generic');
       arrow.setData('genericDamage', this.attackConfig.damage);
+      this.arrows.add(arrow);
       (arrow.body as Phaser.Physics.Arcade.Body).setVelocity(
         Math.cos(angle) * this.attackConfig.projectileSpeed,
         Math.sin(angle) * this.attackConfig.projectileSpeed,
       );
-      this.arrows.add(arrow);
     }
   }
 
@@ -415,8 +415,8 @@ export class GameScene extends Phaser.Scene {
         const rain = this.physics.add.sprite(ax, ay - 100, TEX.arrowPoison);
         rain.setRotation(Math.PI / 2);
         rain.setData('damage', 25);
-        (rain.body as Phaser.Physics.Arcade.Body).setVelocity(0, 300);
         this.rainArrows.add(rain);
+        (rain.body as Phaser.Physics.Arcade.Body).setVelocity(0, 300);
         this.time.delayedCall(600, () => { if (rain.active) rain.destroy(); });
       }
     });
@@ -454,11 +454,11 @@ export class GameScene extends Phaser.Scene {
     arrow.setData('type', 'lacerate');
     arrow.setData('piercing', true);
     arrow.setData('pierceDamage', 80);
+    this.arrows.add(arrow);
     (arrow.body as Phaser.Physics.Arcade.Body).setVelocity(
       Math.cos(angle) * ARROW_SPEED * 1.4,
       Math.sin(angle) * ARROW_SPEED * 1.4,
     );
-    this.arrows.add(arrow);
 
     // Camera shake for impact feel
     this.cameras.main.shake(100, 0.003);
