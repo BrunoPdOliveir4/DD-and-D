@@ -15,20 +15,34 @@ export class LoginScene extends Phaser.Scene {
     bg.fillGradientStyle(PALETTE.bgLight, PALETTE.bgLight, PALETTE.bg, PALETTE.bg, 1);
     bg.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
+    // Decorative circles
+    const deco = this.add.graphics().setAlpha(0.03);
+    deco.lineStyle(1, 0xc9a44e);
+    deco.strokeCircle(GAME_WIDTH / 2, 350, 180);
+    deco.strokeCircle(GAME_WIDTH / 2, 350, 240);
+    this.tweens.add({ targets: deco, alpha: 0.05, duration: 2500, yoyo: true, repeat: -1 });
+
     // Title
-    const title = this.add.text(GAME_WIDTH / 2, 140, 'DD&D', {
+    const title = this.add.text(GAME_WIDTH / 2, 120, 'DD&D', {
       fontFamily: '"Cinzel", serif',
-      fontSize: '64px',
+      fontSize: '56px',
       color: '#c9a44e',
       fontStyle: 'bold',
+      stroke: '#000000',
+      strokeThickness: 4,
     }).setOrigin(0.5);
 
-    this.add.text(GAME_WIDTH / 2, 195, 'DYNAMIC DUNGEONS & DRAGONS', {
+    this.add.text(GAME_WIDTH / 2, 172, 'DYNAMIC DUNGEONS & DRAGONS', {
       fontFamily: '"Cinzel", serif',
-      fontSize: '14px',
-      color: '#71717a',
+      fontSize: '11px',
+      color: '#555',
       letterSpacing: 4,
     }).setOrigin(0.5);
+
+    // Separator
+    const sep = this.add.graphics();
+    sep.lineStyle(1, 0xc9a44e, 0.1);
+    sep.lineBetween(GAME_WIDTH / 2 - 100, 195, GAME_WIDTH / 2 + 100, 195);
 
     // DOM form
     const formHtml = `
@@ -37,16 +51,19 @@ export class LoginScene extends Phaser.Scene {
         font-family: 'Cinzel', serif;
       ">
         <input id="login-username" type="text" placeholder="Usuário" autocomplete="username"
-          style="width: 280px; padding: 10px 16px; background: #16162a; border: 1px solid #2a2a4a;
-          border-radius: 6px; color: #d4d4d8; font-size: 15px; outline: none; font-family: inherit;"
+          style="width: 280px; padding: 10px 16px; background: #0d0d1a; border: 1px solid #1e1e36;
+          border-radius: 8px; color: #d4d4d8; font-size: 14px; outline: none; font-family: 'Inter', sans-serif;
+          transition: border-color 0.2s, box-shadow 0.2s;"
         />
         <input id="login-password" type="password" placeholder="Senha" autocomplete="current-password"
-          style="width: 280px; padding: 10px 16px; background: #16162a; border: 1px solid #2a2a4a;
-          border-radius: 6px; color: #d4d4d8; font-size: 15px; outline: none; font-family: inherit;"
+          style="width: 280px; padding: 10px 16px; background: #0d0d1a; border: 1px solid #1e1e36;
+          border-radius: 8px; color: #d4d4d8; font-size: 14px; outline: none; font-family: 'Inter', sans-serif;
+          transition: border-color 0.2s, box-shadow 0.2s;"
         />
         <input id="login-display" type="text" placeholder="Nome de exibição (registro)" autocomplete="off"
-          style="width: 280px; padding: 10px 16px; background: #16162a; border: 1px solid #2a2a4a;
-          border-radius: 6px; color: #d4d4d8; font-size: 15px; outline: none; font-family: inherit; display: none;"
+          style="width: 280px; padding: 10px 16px; background: #0d0d1a; border: 1px solid #1e1e36;
+          border-radius: 8px; color: #d4d4d8; font-size: 14px; outline: none; font-family: 'Inter', sans-serif;
+          display: none; transition: border-color 0.2s, box-shadow 0.2s;"
         />
         <div style="display: flex; gap: 12px; margin-top: 4px;">
           <button id="btn-login" style="
@@ -67,7 +84,7 @@ export class LoginScene extends Phaser.Scene {
       </div>
     `;
 
-    const dom = this.add.dom(GAME_WIDTH / 2, 380).createFromHTML(formHtml);
+    const dom = this.add.dom(GAME_WIDTH / 2, 370).createFromHTML(formHtml);
     dom.setOrigin(0.5);
 
     let isRegisterMode = false;
