@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { SCENE_KEYS, PALETTE, GAME_WIDTH, GAME_HEIGHT } from '../config';
 import { generateTextures } from '../systems/textures';
+import { generatePlayerTexture, getBasicAttackConfig, type BasicAttackConfig } from '../systems/class-gameplay';
 import {
   TEX, WORLD_WIDTH, WORLD_HEIGHT, PLAYER_RADIUS, PLAYER_SPEED, PLAYER_MAX_HP,
   ENEMY_TYPES, type EnemyType,
@@ -54,6 +55,8 @@ export class GameScene extends Phaser.Scene {
   private abilities: AbilityState[] = [];
   private classId: ClassId = 'hunter';
   private classDef: ClassDef = ALL_CLASSES.hunter;
+  private attackConfig!: BasicAttackConfig;
+  private lastBasicAttackMs = 0;
 
   // Input
   private keys!: { W: Phaser.Input.Keyboard.Key; A: Phaser.Input.Keyboard.Key; S: Phaser.Input.Keyboard.Key; D: Phaser.Input.Keyboard.Key };
@@ -80,14 +83,17 @@ export class GameScene extends Phaser.Scene {
   init(data?: { classId?: ClassId }): void {
     this.classId = data?.classId ?? 'hunter';
     this.classDef = ALL_CLASSES[this.classId];
+    this.attackConfig = getBasicAttackConfig(this.classId);
   }
 
   create(): void {
     generateTextures(this);
+    const playerTex = generatePlayerTexture(this, this.classId);
     this.alive = true;
     this.maxHp = this.classDef.baseStats.maxHealth;
     this.hp = this.maxHp;
     this.quiver = createQuiver();
+    this.lastBasicAttackMs = 0;
     this.abilities = STARTER_ABILITIES.map(a => ({ ...a, lastUsedMs: -99999 }));
     this.wave = 0;
     this.gold = 0;
@@ -98,7 +104,7 @@ export class GameScene extends Phaser.Scene {
     this.drawFloor();
 
     // Player
-    this.player = this.physics.add.sprite(WORLD_WIDTH / 2, WORLD_HEIGHT / 2, TEX.player);
+    this.player = this.physics.add.sprite(WORLD_WIDTH / 2, WORLD_HEIGHT / 2, playerTex);
     this.player.setCircle(PLAYER_RADIUS);
     this.player.setCollideWorldBounds(true);
     this.player.setDepth(10);
@@ -186,7 +192,7 @@ export class GameScene extends Phaser.Scene {
 
     // Player movement trail
     if (len > 0) {
-      const trail = this.add.circle(this.player.x, this.player.y, PLAYER_RADIUS * 0.6, 0x2ecc71, 0.15).setDepth(5);
+      const trail = this.add.circle(this.player.x, this.player.y, PLAYER_RADIUS * 0.6, this.classDef.color, 0.15).setDepth(5);
       this.tweens.add({ targets: trail, alpha: 0, scale: 0.3, duration: 300, onComplete: () => trail.destroy() });
     }
 
@@ -197,9 +203,12 @@ export class GameScene extends Phaser.Scene {
 
     // Aim line preview
     this.aimLine.clear();
-    if (this.isAiming && currentArrow(this.quiver)) {
-      const arrowType = currentArrow(this.quiver)!;
-      const color = ARROW_COLORS[arrowType];
+    if (this.isAiming) {
+      const canShoot = this.classId === 'hunter' ? !!currentArrow(this.quiver) : true;
+      if (canShoot) {
+        const color = this.classId === 'hunter' && currentArrow(this.quiver)
+          ? ARROW_COLORS[currentArrow(this.quiver)!]
+          : this.classDef.color;
       const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, worldPoint.x, worldPoint.y);
       const lineLen = Math.min(dist, 300);
       const endX = this.player.x + Math.cos(angle) * lineLen;
@@ -210,6 +219,7 @@ export class GameScene extends Phaser.Scene {
       // Tip circle
       this.aimLine.fillStyle(color, 0.4);
       this.aimLine.fillCircle(endX, endY, 6);
+      }
     }
 
     // Enemy AI
@@ -274,6 +284,7 @@ export class GameScene extends Phaser.Scene {
       gold: this.gold,
       kills: this.kills,
       isAiming: this.isAiming,
+      classId: this.classId,
       time,
     });
   }
@@ -282,23 +293,80 @@ export class GameScene extends Phaser.Scene {
 
   private shootArrow(): void {
     if (!this.alive) return;
-    const type = currentArrow(this.quiver);
-    if (!type) return;
+    const now = this.time.now;
+
+    // For Hunter: use quiver system
+    if (this.classId === 'hunter') {
+      const type = currentArrow(this.quiver);
+      if (!type) return;
+      const worldPoint = this.cameras.main.getWorldPoint(this.pointer.x, this.pointer.y);
+      const angle = Phaser.Math.Angle.Between(this.player.x, this.player.y, worldPoint.x, worldPoint.y);
+      const texKey = type === 'poison' ? TEX.arrowPoison : type === 'stun' ? TEX.arrowStun : TEX.arrowLacerate;
+      const arrow = this.physics.add.sprite(this.player.x, this.player.y, texKey);
+      arrow.setRotation(angle);
+      arrow.setData('type', type);
+      (arrow.body as Phaser.Physics.Arcade.Body).setVelocity(
+        Math.cos(angle) * ARROW_SPEED, Math.sin(angle) * ARROW_SPEED,
+      );
+      this.arrows.add(arrow);
+      this.quiver = fireArrow(this.quiver, now);
+      return;
+    }
+
+    // For other classes: cooldown-based basic attack
+    if (now - this.lastBasicAttackMs < this.attackConfig.attackCooldownMs) return;
+    this.lastBasicAttackMs = now;
 
     const worldPoint = this.cameras.main.getWorldPoint(this.pointer.x, this.pointer.y);
     const angle = Phaser.Math.Angle.Between(this.player.x, this.player.y, worldPoint.x, worldPoint.y);
 
-    const texKey = type === 'poison' ? TEX.arrowPoison : type === 'stun' ? TEX.arrowStun : TEX.arrowLacerate;
-    const arrow = this.physics.add.sprite(this.player.x, this.player.y, texKey);
-    arrow.setRotation(angle);
-    arrow.setData('type', type);
-    (arrow.body as Phaser.Physics.Arcade.Body).setVelocity(
-      Math.cos(angle) * ARROW_SPEED,
-      Math.sin(angle) * ARROW_SPEED,
-    );
-    this.arrows.add(arrow);
+    if (this.attackConfig.type === 'melee') {
+      // Melee arc attack
+      const arcRange = this.attackConfig.range;
+      const halfAngle = Math.PI / 3;
+      const arc = this.add.graphics().setDepth(12);
+      arc.fillStyle(this.attackConfig.color, 0.3);
+      arc.slice(this.player.x, this.player.y, arcRange, angle - halfAngle, angle + halfAngle, false);
+      arc.fillPath();
+      this.tweens.add({ targets: arc, alpha: 0, duration: 200, onComplete: () => arc.destroy() });
 
-    this.quiver = fireArrow(this.quiver, this.time.now);
+      // Damage enemies in arc
+      this.enemies.getChildren().forEach((obj) => {
+        const enemy = obj as Phaser.Physics.Arcade.Sprite;
+        const data = enemy.getData('d') as EnemyData;
+        if (!data || data.hp <= 0) return;
+        const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, enemy.x, enemy.y);
+        if (dist > arcRange) return;
+        const enemyAngle = Phaser.Math.Angle.Between(this.player.x, this.player.y, enemy.x, enemy.y);
+        let diff = Math.abs(enemyAngle - angle);
+        if (diff > Math.PI) diff = 2 * Math.PI - diff;
+        if (diff <= halfAngle) {
+          this.damageEnemy(enemy, data, this.attackConfig.damage, now, { x: this.player.x, y: this.player.y });
+        }
+      });
+      this.cameras.main.shake(60, 0.003);
+    } else {
+      // Ranged projectile (generic)
+      const g = this.make.graphics({ x: 0, y: 0 }, false);
+      const projKey = `proj_${this.classId}`;
+      if (!this.textures.exists(projKey)) {
+        g.fillStyle(this.attackConfig.color);
+        g.fillRect(0, 0, 10, 4);
+        g.fillStyle(0xffffff, 0.5);
+        g.fillTriangle(10, 0, 14, 2, 10, 4);
+        g.generateTexture(projKey, 14, 4);
+        g.destroy();
+      }
+      const arrow = this.physics.add.sprite(this.player.x, this.player.y, projKey);
+      arrow.setRotation(angle);
+      arrow.setData('type', 'generic');
+      arrow.setData('genericDamage', this.attackConfig.damage);
+      (arrow.body as Phaser.Physics.Arcade.Body).setVelocity(
+        Math.cos(angle) * this.attackConfig.projectileSpeed,
+        Math.sin(angle) * this.attackConfig.projectileSpeed,
+      );
+      this.arrows.add(arrow);
+    }
   }
 
   // ── Abilities ──
@@ -404,10 +472,11 @@ export class GameScene extends Phaser.Scene {
     const data = enemy.getData('d') as EnemyData;
     if (!data || data.hp <= 0) return;
 
-    const type = arrow.getData('type') as ArrowType;
+    const type = arrow.getData('type') as ArrowType | 'generic';
     const piercing = arrow.getData('piercing') as boolean;
     const pierceDmg = arrow.getData('pierceDamage') as number | undefined;
-    let dmg = pierceDmg || ARROW_DAMAGE;
+    const genericDmg = arrow.getData('genericDamage') as number | undefined;
+    let dmg = pierceDmg || genericDmg || ARROW_DAMAGE;
 
     // Lacerate bonus
     if (type === 'lacerate') dmg = Math.round(dmg * 1.5);
