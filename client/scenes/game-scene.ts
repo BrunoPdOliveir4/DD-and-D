@@ -53,6 +53,8 @@ export class GameScene extends Phaser.Scene {
   // Input
   private keys!: { W: Phaser.Input.Keyboard.Key; A: Phaser.Input.Keyboard.Key; S: Phaser.Input.Keyboard.Key; D: Phaser.Input.Keyboard.Key };
   private pointer!: Phaser.Input.Pointer;
+  private aimLine!: Phaser.GameObjects.Graphics;
+  private isAiming = false;
 
   // Groups
   private enemies!: Phaser.Physics.Arcade.Group;
@@ -115,8 +117,22 @@ export class GameScene extends Phaser.Scene {
     };
     this.pointer = this.input.activePointer;
 
+    // Aim line (drawn while holding left button)
+    this.aimLine = this.add.graphics().setDepth(15);
+    this.isAiming = false;
+
+    // Hold left = aim, release = fire
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
-      if (p.leftButtonDown()) this.shootArrow();
+      if (p.leftButtonDown() && this.alive) {
+        this.isAiming = true;
+      }
+    });
+    this.input.on('pointerup', (p: Phaser.Input.Pointer) => {
+      if (this.isAiming && this.alive) {
+        this.isAiming = false;
+        this.aimLine.clear();
+        this.shootArrow();
+      }
     });
 
     this.input.keyboard!.on('keydown-ONE', () => this.useAbility(0));
@@ -159,6 +175,23 @@ export class GameScene extends Phaser.Scene {
     const angle = Phaser.Math.Angle.Between(this.player.x, this.player.y, worldPoint.x, worldPoint.y);
     this.player.setRotation(angle);
 
+    // Aim line preview
+    this.aimLine.clear();
+    if (this.isAiming && currentArrow(this.quiver)) {
+      const arrowType = currentArrow(this.quiver)!;
+      const color = ARROW_COLORS[arrowType];
+      const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, worldPoint.x, worldPoint.y);
+      const lineLen = Math.min(dist, 300);
+      const endX = this.player.x + Math.cos(angle) * lineLen;
+      const endY = this.player.y + Math.sin(angle) * lineLen;
+      // Dashed aim line
+      this.aimLine.lineStyle(2, color, 0.5);
+      this.aimLine.lineBetween(this.player.x, this.player.y, endX, endY);
+      // Tip circle
+      this.aimLine.fillStyle(color, 0.4);
+      this.aimLine.fillCircle(endX, endY, 6);
+    }
+
     // Enemy AI
     this.enemies.getChildren().forEach((obj) => {
       const enemy = obj as Phaser.Physics.Arcade.Sprite;
@@ -168,13 +201,19 @@ export class GameScene extends Phaser.Scene {
       // Stunned?
       if (data.stunUntil > time) {
         (enemy.body as Phaser.Physics.Arcade.Body).setVelocity(0, 0);
+        enemy.setTint(0x3498db); // blue tint while stunned
         return;
       }
 
       // Poison tick
-      if (data.poisonUntil > time && time - data.poisonTickMs > 500) {
-        data.poisonTickMs = time;
-        this.damageEnemy(enemy, data, 8, time);
+      if (data.poisonUntil > time) {
+        enemy.setTint(0x27ae60); // green tint while poisoned
+        if (time - data.poisonTickMs > 500) {
+          data.poisonTickMs = time;
+          this.damageEnemy(enemy, data, 8, time);
+        }
+      } else if (data.stunUntil <= time) {
+        enemy.clearTint();
       }
 
       // Chase player
@@ -188,6 +227,13 @@ export class GameScene extends Phaser.Scene {
       } else {
         (enemy.body as Phaser.Physics.Arcade.Body).setVelocity(0, 0);
       }
+    });
+
+    // Reposition enemy HP bars
+    this.enemies.getChildren().forEach((obj) => {
+      const enemy = obj as Phaser.Physics.Arcade.Sprite;
+      const data = enemy.getData('d') as EnemyData;
+      if (data && data.hp > 0) this.updateEnemyHpBar(enemy, data);
     });
 
     // Arrows out of bounds cleanup
@@ -207,6 +253,7 @@ export class GameScene extends Phaser.Scene {
       wave: this.wave,
       gold: this.gold,
       kills: this.kills,
+      isAiming: this.isAiming,
       time,
     });
   }
@@ -354,7 +401,7 @@ export class GameScene extends Phaser.Scene {
       data.poisonTickMs = now;
     }
 
-    this.damageEnemy(enemy, data, dmg, now);
+    this.damageEnemy(enemy, data, dmg, now, { x: arrow.x, y: arrow.y });
 
     if (!piercing) arrow.destroy();
   }
@@ -393,8 +440,18 @@ export class GameScene extends Phaser.Scene {
 
   // ── Enemy management ──
 
-  private damageEnemy(enemy: Phaser.Physics.Arcade.Sprite, data: EnemyData, dmg: number, _now: number): void {
+  private damageEnemy(enemy: Phaser.Physics.Arcade.Sprite, data: EnemyData, dmg: number, _now: number, knockbackFrom?: { x: number; y: number }): void {
     data.hp -= dmg;
+
+    // Knockback
+    if (knockbackFrom) {
+      const kbAngle = Phaser.Math.Angle.Between(knockbackFrom.x, knockbackFrom.y, enemy.x, enemy.y);
+      const kbForce = 120;
+      (enemy.body as Phaser.Physics.Arcade.Body).setVelocity(
+        Math.cos(kbAngle) * kbForce,
+        Math.sin(kbAngle) * kbForce,
+      );
+    }
 
     // Floating damage text
     const txt = this.add.text(enemy.x, enemy.y - 20, `-${dmg}`, {
