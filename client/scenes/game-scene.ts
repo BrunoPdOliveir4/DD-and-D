@@ -173,6 +173,12 @@ export class GameScene extends Phaser.Scene {
     }
     (this.player.body as Phaser.Physics.Arcade.Body).setVelocity(vx, vy);
 
+    // Player movement trail
+    if (len > 0) {
+      const trail = this.add.circle(this.player.x, this.player.y, PLAYER_RADIUS * 0.6, 0x2ecc71, 0.15).setDepth(5);
+      this.tweens.add({ targets: trail, alpha: 0, scale: 0.3, duration: 300, onComplete: () => trail.destroy() });
+    }
+
     // Rotate toward mouse
     const worldPoint = this.cameras.main.getWorldPoint(this.pointer.x, this.pointer.y);
     const angle = Phaser.Math.Angle.Between(this.player.x, this.player.y, worldPoint.x, worldPoint.y);
@@ -532,7 +538,19 @@ export class GameScene extends Phaser.Scene {
     // Check wave clear
     if (this.enemiesAlive <= 0 && this.waveActive) {
       this.waveActive = false;
-      this.time.delayedCall(2000, () => this.startNextWave());
+      // Wave clear celebration
+      const clearTxt = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, '✨ ONDA CONCLUÍDA!', {
+        fontFamily: '"Cinzel", serif', fontSize: '28px', color: '#2ecc71', fontStyle: 'bold',
+        stroke: '#000000', strokeThickness: 4,
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(50).setScale(0.5);
+      this.tweens.add({
+        targets: clearTxt, scale: 1.2, duration: 400, ease: 'Back.easeOut',
+        onComplete: () => {
+          this.tweens.add({ targets: clearTxt, alpha: 0, y: clearTxt.y - 20, duration: 800, delay: 600, onComplete: () => clearTxt.destroy() });
+        },
+      });
+      this.cameras.main.flash(200, 46, 204, 113);
+      this.time.delayedCall(2500, () => this.startNextWave());
     }
   }
 
@@ -543,6 +561,13 @@ export class GameScene extends Phaser.Scene {
     const enemy = this.physics.add.sprite(pos.x, pos.y, texKey);
     enemy.setCircle(def.radius);
     enemy.setDepth(8);
+    enemy.setAlpha(0);
+    enemy.setScale(0.3);
+
+    // Spawn VFX: fade in + scale up
+    this.tweens.add({ targets: enemy, alpha: 1, scale: 1, duration: 300, ease: 'Back.easeOut' });
+    const spawnRing = this.add.circle(pos.x, pos.y, def.radius * 2, def.color, 0.3).setDepth(4);
+    this.tweens.add({ targets: spawnRing, scale: 2, alpha: 0, duration: 400, onComplete: () => spawnRing.destroy() });
 
     const hpBar = this.add.graphics().setDepth(15);
     const data: EnemyData = {
