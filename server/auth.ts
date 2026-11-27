@@ -8,17 +8,26 @@ import type { PlayerProfile, ClassProgress, ClassId, RegisterRequest, LoginReque
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
 
+const STARTER_ABILITY_IDS: Record<ClassId, string[]> = {
+  hunter: ['hnt_rain_arrows', 'hnt_agile_retreat', 'hnt_piercing_arrow'],
+  berserker: ['bsk_cleave', 'bsk_charge', 'bsk_war_cry'],
+  runekeeper: ['rk_frost_rune', 'rk_fire_rune', 'rk_teleport'],
+  riftblade: ['rb_blink_strike', 'rb_shadow_step', 'rb_void_mark'],
+  trickster: ['tk_juggle', 'tk_smoke_mirror', 'tk_tumble'],
+};
+
 function initialClassProgress(): Record<ClassId, ClassProgress> {
   const classes: ClassId[] = ['berserker', 'hunter', 'runekeeper', 'riftblade', 'trickster'];
   const progress = {} as Record<ClassId, ClassProgress>;
   for (const id of classes) {
+    const starters = STARTER_ABILITY_IDS[id];
     progress[id] = {
-      unlocked: id === 'hunter', // Hunter unlocked by default for now
+      unlocked: true, // All classes unlocked from start
       xp: 0,
       level: 1,
       mastery: 0,
-      unlockedAbilities: [],
-      equippedAbilities: [],
+      unlockedAbilities: [...starters], // 3 starter abilities pre-unlocked
+      equippedAbilities: [...starters], // and pre-equipped
     };
   }
   return progress;

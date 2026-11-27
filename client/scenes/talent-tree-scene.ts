@@ -169,7 +169,8 @@ export class TalentTreeScene extends Phaser.Scene {
 
         // Status text
         if (!isUnlocked) {
-          const cost = (progress?.level ?? 1) * 50;
+          const tierCosts: Record<number, number> = { 1: 100, 2: 250, 3: 500 };
+          const cost = tierCosts[ab.tier] ?? 100;
           this.add.text(bx + 5, ay + 8, `🔒 ${cost}g · Tier ${ab.tier}`, {
             fontFamily: '"Cinzel", serif', fontSize: '9px', color: '#666',
           });
@@ -212,7 +213,7 @@ export class TalentTreeScene extends Phaser.Scene {
         const res = await fetch(`${API_BASE}/class/unlock`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ classId: this.selectedClass, abilityId: ab.id }),
+          body: JSON.stringify({ classId: this.selectedClass, abilityId: ab.id, tier: ab.tier }),
         });
         const data = await res.json();
         if (!res.ok) {

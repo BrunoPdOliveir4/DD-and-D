@@ -8,11 +8,12 @@ import {
 } from '../systems/constants';
 import { ALL_CLASSES } from '../../shared/classes';
 import type { ClassId, ClassDef } from '../../shared/types';
+import { getStoredProfile } from '../services/auth';
 import {
   createQuiver, currentArrow, fireArrow, tickReload, reloadProgress,
   ARROW_DAMAGE, ARROW_SPEED, type ArrowType, type QuiverState, ARROW_COLORS,
 } from '../systems/quiver';
-import { saveRun } from '../services/game-api';
+import { saveRun, type RunResult } from '../services/game-api';
 import { buildWave, randomEdgePosition } from '../systems/wave-manager';
 
 // ── Ability definitions (3 starter abilities per class) ──
@@ -23,6 +24,40 @@ interface AbilityState {
   cooldownMs: number;
   lastUsedMs: number;
 }
+
+// Map ability definition IDs to game-scene ability IDs
+const ABILITY_ID_MAP: Record<string, { id: string; name: string; icon: string; cooldownMs: number }> = {
+  // Hunter
+  'hnt_rain_arrows': { id: 'rain', name: 'Chuva de Flechas', icon: '🏹', cooldownMs: 8000 },
+  'hnt_agile_retreat': { id: 'roll', name: 'Recuo Ágil', icon: '💨', cooldownMs: 5000 },
+  'hnt_piercing_arrow': { id: 'pierce', name: 'Flecha Perfurante', icon: '💎', cooldownMs: 6000 },
+  'hnt_quick_reload': { id: 'quick_reload', name: 'Recarga Rápida', icon: '⚡', cooldownMs: 10000 },
+  'hnt_eagle_eye': { id: 'eagle_eye', name: 'Olho de Águia', icon: '🦅', cooldownMs: 15000 },
+  // Berserker
+  'bsk_cleave': { id: 'cleave', name: 'Cleave', icon: '⚔️', cooldownMs: 5000 },
+  'bsk_charge': { id: 'charge', name: 'Investida', icon: '🏃', cooldownMs: 6000 },
+  'bsk_war_cry': { id: 'war_cry', name: 'Grito de Guerra', icon: '📢', cooldownMs: 12000 },
+  'bsk_axe_throw': { id: 'axe_throw', name: 'Arremesso de Machado', icon: '🪓', cooldownMs: 7000 },
+  'bsk_whirlwind': { id: 'whirlwind', name: 'Redemoinho', icon: '🌪️', cooldownMs: 12000 },
+  // Runekeeper
+  'rk_frost_rune': { id: 'frost_rune', name: 'Runa de Gelo', icon: '❄️', cooldownMs: 6000 },
+  'rk_fire_rune': { id: 'fire_rune', name: 'Runa de Fogo', icon: '🔥', cooldownMs: 7000 },
+  'rk_teleport': { id: 'teleport', name: 'Teleporte Rúnico', icon: '🌀', cooldownMs: 8000 },
+  'rk_arcane_bolt': { id: 'arcane_bolt', name: 'Projétil Arcano', icon: '✨', cooldownMs: 4000 },
+  'rk_chain_lightning': { id: 'chain_lightning', name: 'Relâmpago em Cadeia', icon: '⚡', cooldownMs: 12000 },
+  // Riftblade
+  'rb_blink_strike': { id: 'blink_strike', name: 'Golpe Dimensional', icon: '⚡', cooldownMs: 6000 },
+  'rb_shadow_step': { id: 'shadow_step', name: 'Passo Sombrio', icon: '💨', cooldownMs: 5000 },
+  'rb_void_mark': { id: 'void_mark', name: 'Marca do Vazio', icon: '🎯', cooldownMs: 10000 },
+  'rb_shadow_blade': { id: 'shadow_blade', name: 'Lâmina Sombria', icon: '🗡️', cooldownMs: 4000 },
+  'rb_phase_shift': { id: 'phase_shift', name: 'Fase Dimensional', icon: '👻', cooldownMs: 12000 },
+  // Trickster
+  'tk_juggle': { id: 'juggle', name: 'Malabarismo', icon: '🤹', cooldownMs: 5000 },
+  'tk_smoke_mirror': { id: 'smoke_mirror', name: 'Espelho de Fumaça', icon: '🪞', cooldownMs: 10000 },
+  'tk_tumble': { id: 'tumble', name: 'Cambalhota', icon: '🤸', cooldownMs: 4000 },
+  'tk_poison_flask': { id: 'poison_flask', name: 'Frasco de Veneno', icon: '🧪', cooldownMs: 7000 },
+  'tk_card_trick': { id: 'card_trick', name: 'Truque de Cartas', icon: '🃏', cooldownMs: 8000 },
+};
 
 const STARTER_ABILITIES: Record<string, AbilityState[]> = {
   hunter: [
@@ -116,7 +151,24 @@ export class GameScene extends Phaser.Scene {
     this.hp = this.maxHp;
     this.quiver = createQuiver();
     this.lastBasicAttackMs = 0;
-    this.abilities = (STARTER_ABILITIES[this.classId] ?? STARTER_ABILITIES.hunter).map(a => ({ ...a, lastUsedMs: -99999 }));
+
+    // Load abilities from profile (equipped) or fallback to starters
+    const profile = getStoredProfile();
+    const equipped = profile?.classProgress[this.classId]?.equippedAbilities ?? [];
+    if (equipped.length > 0) {
+      this.abilities = equipped
+        .map(defId => {
+          const mapped = ABILITY_ID_MAP[defId];
+          if (!mapped) return null;
+          return { ...mapped, lastUsedMs: -99999 } as AbilityState;
+        })
+        .filter(Boolean)
+        .slice(0, 5) as AbilityState[];
+    }
+    // Fallback if no equipped or mapping failed
+    if (this.abilities.length === 0) {
+      this.abilities = (STARTER_ABILITIES[this.classId] ?? STARTER_ABILITIES.hunter).map(a => ({ ...a, lastUsedMs: -99999 }));
+    }
     this.wave = 0;
     this.gold = 0;
     this.kills = 0;
@@ -1158,13 +1210,13 @@ export class GameScene extends Phaser.Scene {
 
     // Save run to server
     saveRun(this.wave, this.kills, this.gold, this.classId).then(result => {
-      this.showGameOverUI(result.xpEarned, result.newLevel);
+      this.showGameOverUI(result.xpEarned, result.newLevel, result);
     }).catch(() => {
       this.showGameOverUI(0, 0);
     });
   }
 
-  private showGameOverUI(xpEarned: number, newLevel: number): void {
+  private showGameOverUI(xpEarned: number, newLevel: number, result?: RunResult): void {
     const overlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.7)
       .setScrollFactor(0).setDepth(100);
     overlay.setAlpha(0);
@@ -1192,12 +1244,41 @@ export class GameScene extends Phaser.Scene {
         }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
       }
 
-      const btn = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 80, '[ MENU ]', {
+      // Mastery progress
+      if (result) {
+        const masteryLine = result.masteryUps > 0
+          ? `⭐ Maestria ${result.newMastery} (+${result.masteryUps}!)`
+          : `⭐ Maestria ${result.newMastery}`;
+        this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 50, masteryLine, {
+          fontFamily: '"Cinzel", serif', fontSize: '14px',
+          color: result.masteryUps > 0 ? '#ffd700' : '#c9a44e',
+          stroke: '#000000', strokeThickness: 3,
+          fontStyle: result.masteryUps > 0 ? 'bold' : 'normal',
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
+
+        // XP bar toward next mastery
+        const barW = 200, barH = 8;
+        const barX = GAME_WIDTH / 2 - barW / 2;
+        const barY = GAME_HEIGHT / 2 + 68;
+        const barBg = this.add.graphics().setScrollFactor(0).setDepth(101);
+        barBg.fillStyle(0x333333);
+        barBg.fillRoundedRect(barX, barY, barW, barH, 4);
+        const frac = result.nextMasteryXp > 0 ? result.currentClassXp / result.nextMasteryXp : 0;
+        barBg.fillStyle(0xc9a44e);
+        barBg.fillRoundedRect(barX, barY, barW * Math.min(1, frac), barH, 4);
+
+        this.add.text(GAME_WIDTH / 2, barY + barH + 8, `${result.currentClassXp} / ${result.nextMasteryXp} XP`, {
+          fontFamily: '"Cinzel", serif', fontSize: '10px', color: '#71717a',
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
+      }
+
+      const btn = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 120, '[ MENU ]', {
         fontFamily: '"Cinzel", serif', fontSize: '22px', color: '#c9a44e', fontStyle: 'bold',
       }).setOrigin(0.5).setScrollFactor(0).setDepth(101).setInteractive({ useHandCursor: true });
       btn.on('pointerdown', () => {
         this.scene.stop(SCENE_KEYS.hud);
-        this.scene.start(SCENE_KEYS.mainMenu, { profile: null });
+        const updatedProfile = getStoredProfile();
+        this.scene.start(SCENE_KEYS.mainMenu, { profile: updatedProfile });
       });
       btn.on('pointerover', () => btn.setColor('#f5e6a3'));
       btn.on('pointerout', () => btn.setColor('#c9a44e'));

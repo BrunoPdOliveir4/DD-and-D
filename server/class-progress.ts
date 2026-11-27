@@ -22,7 +22,7 @@ router.post('/unlock', async (req, res) => {
     const playerId = getPlayerId(req);
     if (!playerId) { res.status(401).json({ error: 'Não autenticado' }); return; }
 
-    const { classId, abilityId } = req.body;
+    const { classId, abilityId, tier } = req.body;
     if (!classId || !abilityId) { res.status(400).json({ error: 'classId e abilityId obrigatórios' }); return; }
 
     const db = getDB();
@@ -33,8 +33,9 @@ router.post('/unlock', async (req, res) => {
     if (!progress) { res.status(400).json({ error: 'Classe inválida' }); return; }
     if (!progress.unlocked) { res.status(400).json({ error: 'Classe bloqueada' }); return; }
 
-    // Cost: level × 50 gold
-    const cost = progress.level * 50;
+    // Cost scales by tier: T1=100, T2=250, T3=500
+    const tierCosts: Record<number, number> = { 1: 100, 2: 250, 3: 500 };
+    const cost = tierCosts[tier ?? 1] ?? 100;
     if (player.gold < cost) { res.status(400).json({ error: `Ouro insuficiente (precisa de ${cost})` }); return; }
 
     // Already unlocked?
