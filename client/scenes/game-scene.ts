@@ -33,57 +33,117 @@ const ABILITY_ID_MAP: Record<string, { id: string; name: string; icon: string; c
   'hnt_piercing_arrow': { id: 'pierce', name: 'Flecha Perfurante', icon: '💎', cooldownMs: 6000 },
   'hnt_quick_reload': { id: 'quick_reload', name: 'Recarga Rápida', icon: '⚡', cooldownMs: 10000 },
   'hnt_eagle_eye': { id: 'eagle_eye', name: 'Olho de Águia', icon: '🦅', cooldownMs: 15000 },
+  'hnt_prey_mark': { id: 'prey_mark', name: 'Marca da Presa', icon: '🎯', cooldownMs: 12000 },
+  'hnt_arrow_storm': { id: 'arrow_storm', name: 'Tempestade de Flechas', icon: '🌪️', cooldownMs: 20000 },
+  'hnt_wild_instinct': { id: 'wild_instinct', name: 'Instinto Selvagem', icon: '🐺', cooldownMs: 25000 },
+  'hnt_double_shot': { id: 'double_shot', name: 'Tiro Duplo', icon: '🏹', cooldownMs: 6000 },
+  'hnt_bear_trap': { id: 'bear_trap', name: 'Armadilha de Urso', icon: '🪤', cooldownMs: 10000 },
+  'hnt_camouflage': { id: 'camouflage', name: 'Camuflagem', icon: '🌿', cooldownMs: 16000 },
+  'hnt_falcon_stance': { id: 'falcon_stance', name: 'Postura do Falcão', icon: '🦅', cooldownMs: 18000 },
+  'hnt_homing_arrow': { id: 'homing_arrow', name: 'Flecha Rastreadora', icon: '🏹', cooldownMs: 8000 },
+  'hnt_final_burst': { id: 'final_burst', name: 'Rajada Final', icon: '💥', cooldownMs: 22000 },
+  'hnt_explosive_arrow': { id: 'explosive_arrow', name: 'Flecha Explosiva', icon: '💣', cooldownMs: 10000 },
   // Berserker
   'bsk_cleave': { id: 'cleave', name: 'Cleave', icon: '⚔️', cooldownMs: 5000 },
   'bsk_charge': { id: 'charge', name: 'Investida', icon: '🏃', cooldownMs: 6000 },
   'bsk_war_cry': { id: 'war_cry', name: 'Grito de Guerra', icon: '📢', cooldownMs: 12000 },
   'bsk_axe_throw': { id: 'axe_throw', name: 'Arremesso de Machado', icon: '🪓', cooldownMs: 7000 },
   'bsk_whirlwind': { id: 'whirlwind', name: 'Redemoinho', icon: '🌪️', cooldownMs: 12000 },
+  'bsk_bloodlust': { id: 'bloodlust', name: 'Sede de Sangue', icon: '🩸', cooldownMs: 14000 },
+  'bsk_fury_slam': { id: 'fury_slam', name: 'Golpe Furioso', icon: '💢', cooldownMs: 10000 },
+  'bsk_execute': { id: 'execute', name: 'Execução', icon: '💀', cooldownMs: 8000 },
+  'bsk_iron_skin': { id: 'iron_skin', name: 'Pele de Ferro', icon: '🛡️', cooldownMs: 15000 },
+  'bsk_intimidate': { id: 'intimidate', name: 'Intimidar', icon: '😤', cooldownMs: 16000 },
+  'bsk_undying': { id: 'undying', name: 'Imortal', icon: '💪', cooldownMs: 45000 },
+  'bsk_berserker_rage': { id: 'berserker_rage', name: 'Fúria do Berserker', icon: '🔴', cooldownMs: 25000 },
+  'bsk_ground_pound': { id: 'ground_pound', name: 'Terremoto', icon: '🌋', cooldownMs: 20000 },
+  'bsk_avatar_of_war': { id: 'avatar_of_war', name: 'Avatar de Guerra', icon: '👹', cooldownMs: 60000 },
+  'bsk_rampage': { id: 'rampage', name: 'Frenesi', icon: '🔥', cooldownMs: 18000 },
   // Runekeeper
   'rk_frost_rune': { id: 'frost_rune', name: 'Runa de Gelo', icon: '❄️', cooldownMs: 6000 },
   'rk_fire_rune': { id: 'fire_rune', name: 'Runa de Fogo', icon: '🔥', cooldownMs: 7000 },
   'rk_teleport': { id: 'teleport', name: 'Teleporte Rúnico', icon: '🌀', cooldownMs: 8000 },
   'rk_arcane_bolt': { id: 'arcane_bolt', name: 'Projétil Arcano', icon: '✨', cooldownMs: 4000 },
   'rk_chain_lightning': { id: 'chain_lightning', name: 'Relâmpago em Cadeia', icon: '⚡', cooldownMs: 12000 },
+  'rk_rune_shield': { id: 'rune_shield', name: 'Escudo Rúnico', icon: '🛡️', cooldownMs: 14000 },
+  'rk_summon_golem': { id: 'summon_golem', name: 'Invocar Golem', icon: '🗿', cooldownMs: 20000 },
+  'rk_mana_drain': { id: 'mana_drain', name: 'Drenar Mana', icon: '💜', cooldownMs: 16000 },
+  'rk_summon_wisp': { id: 'summon_wisp', name: 'Invocar Wisp', icon: '🧚', cooldownMs: 18000 },
+  'rk_time_warp': { id: 'time_warp', name: 'Distorção Temporal', icon: '⏳', cooldownMs: 20000 },
+  'rk_rune_trap': { id: 'rune_trap', name: 'Runa Armadilha', icon: '🪤', cooldownMs: 10000 },
+  'rk_meteor': { id: 'meteor', name: 'Meteoro', icon: '☄️', cooldownMs: 25000 },
+  'rk_rune_overload': { id: 'rune_overload', name: 'Sobrecarga Rúnica', icon: '💥', cooldownMs: 22000 },
+  'rk_elemental_fusion': { id: 'elemental_fusion', name: 'Fusão Elemental', icon: '🌈', cooldownMs: 30000 },
+  'rk_arcane_singularity': { id: 'arcane_singularity', name: 'Singularidade Arcana', icon: '🕳️', cooldownMs: 50000 },
   // Riftblade
   'rb_blink_strike': { id: 'blink_strike', name: 'Golpe Dimensional', icon: '⚡', cooldownMs: 6000 },
   'rb_shadow_step': { id: 'shadow_step', name: 'Passo Sombrio', icon: '💨', cooldownMs: 5000 },
   'rb_void_mark': { id: 'void_mark', name: 'Marca do Vazio', icon: '🎯', cooldownMs: 10000 },
   'rb_shadow_blade': { id: 'shadow_blade', name: 'Lâmina Sombria', icon: '🗡️', cooldownMs: 4000 },
   'rb_phase_shift': { id: 'phase_shift', name: 'Fase Dimensional', icon: '👻', cooldownMs: 12000 },
+  'rb_spatial_rift': { id: 'spatial_rift', name: 'Fenda Espacial', icon: '🌀', cooldownMs: 18000 },
+  'rb_void_eruption': { id: 'void_eruption', name: 'Erupção do Vazio', icon: '💥', cooldownMs: 14000 },
+  'rb_clone_assault': { id: 'clone_assault', name: 'Assalto de Clones', icon: '👥', cooldownMs: 16000 },
+  'rb_dimensional_slash': { id: 'dimensional_slash', name: 'Corte Dimensional', icon: '✂️', cooldownMs: 20000 },
+  'rb_void_anchor': { id: 'void_anchor', name: 'Âncora Dimensional', icon: '⚓', cooldownMs: 14000 },
+  'rb_gravity_well': { id: 'gravity_well', name: 'Poço Gravitacional', icon: '🌑', cooldownMs: 16000 },
+  'rb_temporal_rewind': { id: 'temporal_rewind', name: 'Rebobinar', icon: '⏪', cooldownMs: 25000 },
+  'rb_assassinate': { id: 'assassinate', name: 'Assassinar', icon: '☠️', cooldownMs: 30000 },
+  'rb_mirror_dimension': { id: 'mirror_dimension', name: 'Dimensão Espelho', icon: '🪞', cooldownMs: 35000 },
+  'rb_reality_shatter': { id: 'reality_shatter', name: 'Estilhaçar Realidade', icon: '💎', cooldownMs: 55000 },
   // Trickster
   'tk_juggle': { id: 'juggle', name: 'Malabarismo', icon: '🤹', cooldownMs: 5000 },
   'tk_smoke_mirror': { id: 'smoke_mirror', name: 'Espelho de Fumaça', icon: '🪞', cooldownMs: 10000 },
   'tk_tumble': { id: 'tumble', name: 'Cambalhota', icon: '🤸', cooldownMs: 4000 },
   'tk_poison_flask': { id: 'poison_flask', name: 'Frasco de Veneno', icon: '🧪', cooldownMs: 7000 },
   'tk_card_trick': { id: 'card_trick', name: 'Truque de Cartas', icon: '🃏', cooldownMs: 8000 },
+  'tk_vanish': { id: 'vanish', name: 'Desaparecer', icon: '💨', cooldownMs: 14000 },
+  'tk_explosive_confetti': { id: 'explosive_confetti', name: 'Confete Explosivo', icon: '🎉', cooldownMs: 12000 },
+  'tk_knife_rain': { id: 'knife_rain', name: 'Chuva de Facas', icon: '🔪', cooldownMs: 10000 },
+  'tk_grand_finale': { id: 'grand_finale', name: 'Grand Finale', icon: '🎆', cooldownMs: 35000 },
+  'tk_swap': { id: 'swap', name: 'Troca', icon: '🔄', cooldownMs: 12000 },
+  'tk_puppet_show': { id: 'puppet_show', name: 'Show de Marionetes', icon: '🎭', cooldownMs: 20000 },
+  'tk_lucky_coin': { id: 'lucky_coin', name: 'Moeda da Sorte', icon: '🪙', cooldownMs: 18000 },
+  'tk_hall_of_mirrors': { id: 'hall_of_mirrors', name: 'Salão de Espelhos', icon: '🏰', cooldownMs: 30000 },
+  'tk_chaos_roulette': { id: 'chaos_roulette', name: 'Roleta do Caos', icon: '🎰', cooldownMs: 15000 },
+  'tk_curtain_call': { id: 'curtain_call', name: 'Última Cortina', icon: '🎪', cooldownMs: 60000 },
 };
 
 const STARTER_ABILITIES: Record<string, AbilityState[]> = {
   hunter: [
     { id: 'rain', name: 'Chuva de Flechas', icon: '🏹', cooldownMs: 8000, lastUsedMs: -99999 },
     { id: 'roll', name: 'Recuo Ágil', icon: '💨', cooldownMs: 5000, lastUsedMs: -99999 },
+    { id: 'eagle_eye', name: 'Olho de Águia', icon: '🦅', cooldownMs: 15000, lastUsedMs: -99999 },
+    { id: 'arrow_storm', name: 'Tempestade de Flechas', icon: '🌪️', cooldownMs: 20000, lastUsedMs: -99999 },
     { id: 'pierce', name: 'Flecha Perfurante', icon: '💎', cooldownMs: 6000, lastUsedMs: -99999 },
   ],
   berserker: [
-    { id: 'cleave', name: 'Cleave', icon: '⚔️', cooldownMs: 5000, lastUsedMs: -99999 },
-    { id: 'charge', name: 'Investida', icon: '🏃', cooldownMs: 6000, lastUsedMs: -99999 },
+    { id: 'axe_throw', name: 'Arremesso de Machado', icon: '🪓', cooldownMs: 7000, lastUsedMs: -99999 },
     { id: 'war_cry', name: 'Grito de Guerra', icon: '📢', cooldownMs: 12000, lastUsedMs: -99999 },
+    { id: 'bloodlust', name: 'Sede de Sangue', icon: '🩸', cooldownMs: 14000, lastUsedMs: -99999 },
+    { id: 'fury_slam', name: 'Golpe Furioso', icon: '💢', cooldownMs: 10000, lastUsedMs: -99999 },
+    { id: 'cleave', name: 'Cleave', icon: '⚔️', cooldownMs: 5000, lastUsedMs: -99999 },
   ],
   runekeeper: [
     { id: 'frost_rune', name: 'Runa de Gelo', icon: '❄️', cooldownMs: 6000, lastUsedMs: -99999 },
     { id: 'fire_rune', name: 'Runa de Fogo', icon: '🔥', cooldownMs: 7000, lastUsedMs: -99999 },
-    { id: 'teleport', name: 'Teleporte Rúnico', icon: '🌀', cooldownMs: 8000, lastUsedMs: -99999 },
+    { id: 'summon_golem', name: 'Invocar Golem', icon: '🗿', cooldownMs: 20000, lastUsedMs: -99999 },
+    { id: 'rune_shield', name: 'Escudo Rúnico', icon: '🛡️', cooldownMs: 14000, lastUsedMs: -99999 },
+    { id: 'arcane_bolt', name: 'Projétil Arcano', icon: '✨', cooldownMs: 4000, lastUsedMs: -99999 },
   ],
   riftblade: [
     { id: 'blink_strike', name: 'Golpe Dimensional', icon: '⚡', cooldownMs: 6000, lastUsedMs: -99999 },
-    { id: 'shadow_step', name: 'Passo Sombrio', icon: '💨', cooldownMs: 5000, lastUsedMs: -99999 },
     { id: 'void_mark', name: 'Marca do Vazio', icon: '🎯', cooldownMs: 10000, lastUsedMs: -99999 },
+    { id: 'phase_shift', name: 'Fase Dimensional', icon: '👻', cooldownMs: 12000, lastUsedMs: -99999 },
+    { id: 'spatial_rift', name: 'Fenda Espacial', icon: '🌀', cooldownMs: 18000, lastUsedMs: -99999 },
+    { id: 'shadow_blade', name: 'Lâmina Sombria', icon: '🗡️', cooldownMs: 4000, lastUsedMs: -99999 },
   ],
   trickster: [
     { id: 'juggle', name: 'Malabarismo', icon: '🤹', cooldownMs: 5000, lastUsedMs: -99999 },
     { id: 'smoke_mirror', name: 'Espelho de Fumaça', icon: '🪞', cooldownMs: 10000, lastUsedMs: -99999 },
-    { id: 'tumble', name: 'Cambalhota', icon: '🤸', cooldownMs: 4000, lastUsedMs: -99999 },
+    { id: 'card_trick', name: 'Truque de Cartas', icon: '🃏', cooldownMs: 8000, lastUsedMs: -99999 },
+    { id: 'vanish', name: 'Desaparecer', icon: '💨', cooldownMs: 14000, lastUsedMs: -99999 },
+    { id: 'poison_flask', name: 'Frasco de Veneno', icon: '🧪', cooldownMs: 7000, lastUsedMs: -99999 },
   ],
 };
 
@@ -144,6 +204,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   create(): void {
+    // Clean up any lingering state from previous run
+    this.input.keyboard!.removeAllListeners();
+    this.input.removeAllListeners();
+    this.pauseOverlay = null;
+
     generateTextures(this);
     const playerTex = generatePlayerTexture(this, this.classId);
     this.alive = true;
@@ -232,16 +297,17 @@ export class GameScene extends Phaser.Scene {
     this.input.keyboard!.on('keydown-ONE', () => this.useAbility(0));
     this.input.keyboard!.on('keydown-TWO', () => this.useAbility(1));
     this.input.keyboard!.on('keydown-THREE', () => this.useAbility(2));
+    this.input.keyboard!.on('keydown-FOUR', () => this.useAbility(3));
+    this.input.keyboard!.on('keydown-FIVE', () => this.useAbility(4));
     this.input.keyboard!.on('keydown-ESC', () => {
       if (!this.alive) return;
-      // Between waves: save and exit
+      // Between waves: offer exit
       if (!this.waveActive && this.wave > 0) {
-        this.exitWithRewards();
+        this.showPauseMenu(true);
         return;
       }
-      // During wave: simple pause
-      this.scene.pause();
-      this.input.once('pointerdown', () => this.scene.resume());
+      // During wave: pause menu
+      this.showPauseMenu(false);
     });
 
     // HUD
@@ -1206,6 +1272,125 @@ export class GameScene extends Phaser.Scene {
     vg.fillRect(0, WORLD_HEIGHT - 80, WORLD_WIDTH, 80); // bottom
     vg.fillRect(0, 0, 80, WORLD_HEIGHT); // left
     vg.fillRect(WORLD_WIDTH - 80, 0, 80, WORLD_HEIGHT); // right
+  }
+
+  private pauseOverlay: Phaser.GameObjects.Container | null = null;
+
+  // ── Pause Menu ──
+
+  private showPauseMenu(canExit: boolean): void {
+    if (this.pauseOverlay) return; // already showing
+
+    this.scene.pause();
+    this.scene.pause(SCENE_KEYS.hud);
+
+    const container = this.add.container(0, 0).setDepth(500).setScrollFactor(0);
+    this.pauseOverlay = container;
+
+    // Dim overlay
+    const dim = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.7)
+      .setScrollFactor(0);
+    container.add(dim);
+
+    // Panel
+    const pw = 320, ph = canExit ? 240 : 180;
+    const px = GAME_WIDTH / 2 - pw / 2, py = GAME_HEIGHT / 2 - ph / 2;
+    const panel = this.add.graphics().setScrollFactor(0);
+    panel.fillStyle(0x0d0d1a, 0.95);
+    panel.fillRoundedRect(px, py, pw, ph, 10);
+    panel.lineStyle(1, 0xc9a44e, 0.2);
+    panel.strokeRoundedRect(px, py, pw, ph, 10);
+    container.add(panel);
+
+    // Title
+    container.add(this.add.text(GAME_WIDTH / 2, py + 28, 'PAUSADO', {
+      fontFamily: '"Cinzel", serif', fontSize: '24px', color: '#c9a44e', fontStyle: 'bold',
+    }).setOrigin(0.5).setScrollFactor(0));
+
+    // Stats
+    container.add(this.add.text(GAME_WIDTH / 2, py + 58, `Onda ${this.wave}  ·  ${this.kills} kills  ·  ${this.gold} 🪙`, {
+      fontFamily: 'Inter, sans-serif', fontSize: '12px', color: '#71717a',
+    }).setOrigin(0.5).setScrollFactor(0));
+
+    // Resume button
+    const resumeY = py + 95;
+    const resumeBtn = this.createPauseButton(container, GAME_WIDTH / 2, resumeY, 'CONTINUAR', '#2ecc71');
+    resumeBtn.on('pointerdown', () => this.closePauseMenu());
+
+    if (canExit) {
+      // Exit with rewards button
+      const exitY = py + 145;
+      const exitBtn = this.createPauseButton(container, GAME_WIDTH / 2, exitY, 'RETIRADA TÁTICA', '#c9a44e');
+      exitBtn.on('pointerdown', () => {
+        this.closePauseMenu();
+        this.scene.resume();
+        this.scene.resume(SCENE_KEYS.hud);
+        this.exitWithRewards();
+      });
+
+      container.add(this.add.text(GAME_WIDTH / 2, exitY + 22, 'Salva XP, ouro e maestria', {
+        fontFamily: 'Inter, sans-serif', fontSize: '9px', color: '#555',
+      }).setOrigin(0.5).setScrollFactor(0));
+    }
+
+    // ESC hint
+    container.add(this.add.text(GAME_WIDTH / 2, py + ph - 16, 'ESC para voltar', {
+      fontFamily: 'Inter, sans-serif', fontSize: '9px', color: '#3a3a3a',
+    }).setOrigin(0.5).setScrollFactor(0));
+
+    // Listen for ESC to close
+    const escHandler = () => {
+      this.closePauseMenu();
+      this.input.keyboard!.off('keydown-ESC', escHandler);
+    };
+    // Need small delay so the current ESC keydown doesn't immediately close
+    this.time.delayedCall(100, () => {
+      this.input.keyboard!.on('keydown-ESC', escHandler);
+    });
+  }
+
+  private createPauseButton(container: Phaser.GameObjects.Container, x: number, y: number, label: string, color: string): Phaser.GameObjects.Zone {
+    const bw = 240, bh = 38;
+    const bg = this.add.graphics().setScrollFactor(0);
+    bg.fillStyle(0x16162a, 0.9);
+    bg.fillRoundedRect(x - bw / 2, y - bh / 2, bw, bh, 6);
+    bg.lineStyle(1, Phaser.Display.Color.HexStringToColor(color).color, 0.3);
+    bg.strokeRoundedRect(x - bw / 2, y - bh / 2, bw, bh, 6);
+    container.add(bg);
+
+    const text = this.add.text(x, y, label, {
+      fontFamily: '"Cinzel", serif', fontSize: '14px', color, fontStyle: 'bold',
+    }).setOrigin(0.5).setScrollFactor(0);
+    container.add(text);
+
+    const hitZone = this.add.zone(x, y, bw, bh).setScrollFactor(0).setInteractive({ useHandCursor: true });
+    container.add(hitZone);
+    hitZone.on('pointerover', () => {
+      text.setColor('#ffffff');
+      bg.clear();
+      bg.fillStyle(0x1e1e36, 0.95);
+      bg.fillRoundedRect(x - bw / 2, y - bh / 2, bw, bh, 6);
+      bg.lineStyle(1, Phaser.Display.Color.HexStringToColor(color).color, 0.6);
+      bg.strokeRoundedRect(x - bw / 2, y - bh / 2, bw, bh, 6);
+    });
+    hitZone.on('pointerout', () => {
+      text.setColor(color);
+      bg.clear();
+      bg.fillStyle(0x16162a, 0.9);
+      bg.fillRoundedRect(x - bw / 2, y - bh / 2, bw, bh, 6);
+      bg.lineStyle(1, Phaser.Display.Color.HexStringToColor(color).color, 0.3);
+      bg.strokeRoundedRect(x - bw / 2, y - bh / 2, bw, bh, 6);
+    });
+    return hitZone;
+  }
+
+  private closePauseMenu(): void {
+    if (this.pauseOverlay) {
+      this.pauseOverlay.destroy();
+      this.pauseOverlay = null;
+    }
+    this.scene.resume();
+    this.scene.resume(SCENE_KEYS.hud);
   }
 
   // ── Exit between waves (save progress) ──
