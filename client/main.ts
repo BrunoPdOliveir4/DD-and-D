@@ -3,6 +3,7 @@ import { GAME_WIDTH, GAME_HEIGHT } from './config';
 import { BootScene } from './scenes/boot-scene';
 import { LoginScene } from './scenes/login-scene';
 import { MainMenuScene } from './scenes/main-menu-scene';
+import { ClassSelectScene } from './scenes/class-select-scene';
 import { GameScene } from './scenes/game-scene';
 import { HudScene } from './scenes/hud-scene';
 
@@ -23,7 +24,7 @@ const config: Phaser.Types.Core.GameConfig = {
   dom: {
     createContainer: true,
   },
-  scene: [BootScene, LoginScene, MainMenuScene, GameScene, HudScene],
+  scene: [BootScene, LoginScene, MainMenuScene, ClassSelectScene, GameScene, HudScene],
 };
 
 new Phaser.Game(config);

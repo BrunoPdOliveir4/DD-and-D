@@ -76,8 +76,34 @@ export interface ClassProgress {
   unlocked: boolean;
   xp: number;
   level: number;
+  mastery: number; // infinite mastery points earned
   unlockedAbilities: string[]; // ability IDs
   equippedAbilities: string[]; // 5 equipped ability IDs
+}
+
+// ── Mastery system (infinite progression) ──
+
+/** XP needed to reach a mastery level. Scales infinitely. */
+export function masteryXpRequired(currentMastery: number): number {
+  // Base 500, +200 per level, quadratic scaling
+  return 500 + currentMastery * 200 + Math.floor(currentMastery * currentMastery * 10);
+}
+
+/** Mastery bonuses per point */
+export interface MasteryBonus {
+  damagePercent: number;   // +1% per mastery
+  healthPercent: number;   // +0.5% per mastery
+  cooldownPercent: number; // -0.3% per mastery (capped at 30%)
+  goldBonus: number;       // +2% per mastery
+}
+
+export function masteryBonuses(mastery: number): MasteryBonus {
+  return {
+    damagePercent: mastery * 1,
+    healthPercent: mastery * 0.5,
+    cooldownPercent: Math.min(30, mastery * 0.3),
+    goldBonus: mastery * 2,
+  };
 }
 
 // ── Guild ──

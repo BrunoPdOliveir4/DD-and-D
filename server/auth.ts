@@ -16,6 +16,7 @@ function initialClassProgress(): Record<ClassId, ClassProgress> {
       unlocked: id === 'hunter', // Hunter unlocked by default for now
       xp: 0,
       level: 1,
+      mastery: 0,
       unlockedAbilities: [],
       equippedAbilities: [],
     };

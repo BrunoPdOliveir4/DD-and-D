@@ -5,6 +5,8 @@ import {
   TEX, WORLD_WIDTH, WORLD_HEIGHT, PLAYER_RADIUS, PLAYER_SPEED, PLAYER_MAX_HP,
   ENEMY_TYPES, type EnemyType,
 } from '../systems/constants';
+import { ALL_CLASSES } from '../../shared/classes';
+import type { ClassId, ClassDef } from '../../shared/types';
 import {
   createQuiver, currentArrow, fireArrow, tickReload, reloadProgress,
   ARROW_DAMAGE, ARROW_SPEED, type ArrowType, type QuiverState, ARROW_COLORS,
@@ -50,6 +52,8 @@ export class GameScene extends Phaser.Scene {
   private alive = true;
   private quiver: QuiverState = createQuiver();
   private abilities: AbilityState[] = [];
+  private classId: ClassId = 'hunter';
+  private classDef: ClassDef = ALL_CLASSES.hunter;
 
   // Input
   private keys!: { W: Phaser.Input.Keyboard.Key; A: Phaser.Input.Keyboard.Key; S: Phaser.Input.Keyboard.Key; D: Phaser.Input.Keyboard.Key };
@@ -73,10 +77,16 @@ export class GameScene extends Phaser.Scene {
     super(SCENE_KEYS.game);
   }
 
+  init(data?: { classId?: ClassId }): void {
+    this.classId = data?.classId ?? 'hunter';
+    this.classDef = ALL_CLASSES[this.classId];
+  }
+
   create(): void {
     generateTextures(this);
     this.alive = true;
-    this.hp = PLAYER_MAX_HP;
+    this.maxHp = this.classDef.baseStats.maxHealth;
+    this.hp = this.maxHp;
     this.quiver = createQuiver();
     this.abilities = STARTER_ABILITIES.map(a => ({ ...a, lastUsedMs: -99999 }));
     this.wave = 0;
@@ -682,7 +692,7 @@ export class GameScene extends Phaser.Scene {
     (this.player.body as Phaser.Physics.Arcade.Body).setVelocity(0, 0);
 
     // Save run to server
-    saveRun(this.wave, this.kills, this.gold, 'hunter').then(result => {
+    saveRun(this.wave, this.kills, this.gold, this.classId).then(result => {
       this.showGameOverUI(result.xpEarned, result.newLevel);
     }).catch(() => {
       this.showGameOverUI(0, 0);
