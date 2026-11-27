@@ -46,9 +46,10 @@ export class MainMenuScene extends Phaser.Scene {
 
     // Menu buttons
     const buttons = [
-      { label: 'JOGAR', callback: () => this.scene.start(SCENE_KEYS.classSelect, { profile: this.profile }) },
-      { label: 'GUILDA', callback: () => this.scene.start(SCENE_KEYS.guild, { profile: this.profile }) },
+      { label: 'ARENA', callback: () => this.scene.start(SCENE_KEYS.classSelect, { profile: this.profile, gameMode: 'arena' }) },
+      { label: 'DUNGEON', callback: () => this.scene.start(SCENE_KEYS.classSelect, { profile: this.profile, gameMode: 'dungeon' }) },
       { label: 'TALENTOS', callback: () => this.scene.start(SCENE_KEYS.talentTree, { profile: this.profile }) },
+      { label: 'GUILDA', callback: () => this.scene.start(SCENE_KEYS.guild, { profile: this.profile }) },
       { label: 'SAIR', callback: () => { clearAuth(); this.scene.start(SCENE_KEYS.login); } },
     ];
 

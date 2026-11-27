@@ -5,6 +5,7 @@ import { connectDB } from './db';
 import authRouter from './auth';
 import gameRouter from './game';
 import guildRouter from './guild';
+import classProgressRouter from './class-progress';
 
 dotenv.config();
 
@@ -21,6 +22,7 @@ async function main() {
   app.use('/api/auth', authRouter);
   app.use('/api/game', gameRouter);
   app.use('/api/guild', guildRouter);
+  app.use('/api/class', classProgressRouter);
 
   // Health check
   app.get('/api/health', (_req, res) => {

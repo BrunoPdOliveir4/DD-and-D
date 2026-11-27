@@ -11,6 +11,7 @@ export const SCENE_KEYS = {
   game: 'GameScene',
   hud: 'HudScene',
   guild: 'GuildScene',
+  dungeonMap: 'DungeonMapScene',
 } as const;
 
 export const PALETTE = {

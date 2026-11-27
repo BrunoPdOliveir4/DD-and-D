@@ -8,6 +8,7 @@ import { getStoredProfile } from '../services/auth';
 export class ClassSelectScene extends Phaser.Scene {
   private profile!: PlayerProfile | null;
   private selectedIndex = 0;
+  private gameMode: 'arena' | 'dungeon' = 'arena';
   private items: Array<{ classId: ClassId; def: ClassDef; container: Phaser.GameObjects.Container }> = [];
   private detailsContainer: Phaser.GameObjects.Container | null = null;
 
@@ -15,8 +16,9 @@ export class ClassSelectScene extends Phaser.Scene {
     super(SCENE_KEYS.classSelect);
   }
 
-  init(data?: { profile?: PlayerProfile }): void {
+  init(data?: { profile?: PlayerProfile; gameMode?: 'arena' | 'dungeon' }): void {
     this.profile = data?.profile ?? getStoredProfile();
+    this.gameMode = data?.gameMode ?? 'arena';
   }
 
   create(): void {
@@ -203,7 +205,11 @@ export class ClassSelectScene extends Phaser.Scene {
     if (progress && !progress.unlocked) return;
     this.cameras.main.fadeOut(300, 0, 0, 0);
     this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
-      this.scene.start(SCENE_KEYS.game, { classId });
+      if (this.gameMode === 'dungeon') {
+        this.scene.start(SCENE_KEYS.dungeonMap, { classId });
+      } else {
+        this.scene.start(SCENE_KEYS.game, { classId });
+      }
     });
   }
 }

@@ -9,6 +9,7 @@ import { HudScene } from './scenes/hud-scene';
 import { TutorialScene } from './scenes/tutorial-scene';
 import { TalentTreeScene } from './scenes/talent-tree-scene';
 import { GuildScene } from './scenes/guild-scene';
+import { DungeonMapScene } from './scenes/dungeon-map-scene';
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -27,7 +28,7 @@ const config: Phaser.Types.Core.GameConfig = {
   dom: {
     createContainer: true,
   },
-  scene: [BootScene, LoginScene, MainMenuScene, ClassSelectScene, GameScene, HudScene, TutorialScene, TalentTreeScene, GuildScene],
+  scene: [BootScene, LoginScene, MainMenuScene, ClassSelectScene, GameScene, HudScene, TutorialScene, TalentTreeScene, GuildScene, DungeonMapScene],
 };
 
 new Phaser.Game(config);
