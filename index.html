@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>DD&D — Dynamic Dungeons & Dragons</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; background: #0a0a0f; overflow: hidden; }
+    #game-container { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+    
+    /* Loading screen */
+    #loading-screen {
+      position: fixed; inset: 0; z-index: 1000;
+      background: radial-gradient(ellipse at center, #1a1a2e 0%, #0a0a0f 70%);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      font-family: 'Cinzel', serif; transition: opacity 0.5s;
+    }
+    #loading-screen h1 {
+      font-size: 48px; letter-spacing: 6px;
+      background: linear-gradient(135deg, #c9a44e 0%, #f5e6a3 40%, #c9a44e 60%, #8b6914 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      text-shadow: none; margin-bottom: 8px;
+    }
+    #loading-screen .subtitle {
+      font-size: 14px; color: #666; letter-spacing: 3px; margin-bottom: 32px;
+    }
+    .loading-bar-container {
+      width: 300px; height: 4px; background: #1a1a2e; border-radius: 2px; overflow: hidden;
+    }
+    .loading-bar-fill {
+      height: 100%; width: 30%;
+      background: linear-gradient(90deg, transparent, #c9a44e, transparent);
+      animation: loading-slide 1.5s ease-in-out infinite;
+    }
+    @keyframes loading-slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(400%); } }
+  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div id="loading-screen">
+    <h1>DD&D</h1>
+    <div class="subtitle">DYNAMIC DUNGEONS & DRAGONS</div>
+    <div class="loading-bar-container">
+      <div class="loading-bar-fill"></div>
+    </div>
+  </div>
+  <div id="game-container"></div>
+  <script type="module" src="/client/main.ts"></script>
+</body>
+</html>
