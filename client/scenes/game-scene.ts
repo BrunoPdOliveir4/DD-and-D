@@ -233,8 +233,14 @@ export class GameScene extends Phaser.Scene {
     this.input.keyboard!.on('keydown-TWO', () => this.useAbility(1));
     this.input.keyboard!.on('keydown-THREE', () => this.useAbility(2));
     this.input.keyboard!.on('keydown-ESC', () => {
+      if (!this.alive) return;
+      // Between waves: save and exit
+      if (!this.waveActive && this.wave > 0) {
+        this.exitWithRewards();
+        return;
+      }
+      // During wave: simple pause
       this.scene.pause();
-      // Simple resume on click
       this.input.once('pointerdown', () => this.scene.resume());
     });
 
@@ -1200,6 +1206,85 @@ export class GameScene extends Phaser.Scene {
     vg.fillRect(0, WORLD_HEIGHT - 80, WORLD_WIDTH, 80); // bottom
     vg.fillRect(0, 0, 80, WORLD_HEIGHT); // left
     vg.fillRect(WORLD_WIDTH - 80, 0, 80, WORLD_HEIGHT); // right
+  }
+
+  // ── Exit between waves (save progress) ──
+
+  private exitWithRewards(): void {
+    this.alive = false; // prevent further actions
+    (this.player.body as Phaser.Physics.Arcade.Body).setVelocity(0, 0);
+
+    saveRun(this.wave, this.kills, this.gold, this.classId).then(result => {
+      this.showExitUI(result);
+    }).catch(() => {
+      this.showExitUI(null);
+    });
+  }
+
+  private showExitUI(result: RunResult | null): void {
+    const overlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.75)
+      .setScrollFactor(0).setDepth(100);
+    overlay.setAlpha(0);
+    this.tweens.add({ targets: overlay, alpha: 1, duration: 300 });
+
+    this.time.delayedCall(300, () => {
+      this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 90, 'RETIRADA TÁTICA', {
+        fontFamily: '"Cinzel", serif', fontSize: '36px', color: '#c9a44e', fontStyle: 'bold',
+        stroke: '#000000', strokeThickness: 5,
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
+
+      this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 40, [
+        `⚔️ Onda ${this.wave}`,
+        `💀 ${this.kills} kills`,
+        `🪙 ${this.gold} ouro`,
+      ].join('  ·  '), {
+        fontFamily: '"Cinzel", serif', fontSize: '16px', color: '#d4d4d8',
+        stroke: '#000000', strokeThickness: 3,
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
+
+      if (result) {
+        this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 10, `+${result.xpEarned} XP  ·  +${result.goldEarned} ouro`, {
+          fontFamily: '"Cinzel", serif', fontSize: '14px', color: '#c9a44e',
+          stroke: '#000000', strokeThickness: 3,
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
+
+        // Mastery
+        const masteryLine = result.masteryUps > 0
+          ? `⭐ Maestria ${result.newMastery} (+${result.masteryUps}!)`
+          : `⭐ Maestria ${result.newMastery}`;
+        this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 15, masteryLine, {
+          fontFamily: '"Cinzel", serif', fontSize: '13px',
+          color: result.masteryUps > 0 ? '#ffd700' : '#c9a44e',
+          stroke: '#000000', strokeThickness: 3,
+          fontStyle: result.masteryUps > 0 ? 'bold' : 'normal',
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
+
+        // Mastery XP bar
+        const barW = 180, barH = 6;
+        const barX = GAME_WIDTH / 2 - barW / 2, barY = GAME_HEIGHT / 2 + 34;
+        const barBg = this.add.graphics().setScrollFactor(0).setDepth(101);
+        barBg.fillStyle(0x333333);
+        barBg.fillRoundedRect(barX, barY, barW, barH, 3);
+        const frac = result.nextMasteryXp > 0 ? result.currentClassXp / result.nextMasteryXp : 0;
+        barBg.fillStyle(0xc9a44e);
+        barBg.fillRoundedRect(barX, barY, barW * Math.min(1, frac), barH, 3);
+
+        this.add.text(GAME_WIDTH / 2, barY + 12, `${result.currentClassXp} / ${result.nextMasteryXp} XP`, {
+          fontFamily: '"Cinzel", serif', fontSize: '9px', color: '#71717a',
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
+      }
+
+      const btn = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 80, '[ MENU ]', {
+        fontFamily: '"Cinzel", serif', fontSize: '22px', color: '#c9a44e', fontStyle: 'bold',
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(101).setInteractive({ useHandCursor: true });
+      btn.on('pointerdown', () => {
+        this.scene.stop(SCENE_KEYS.hud);
+        const updatedProfile = getStoredProfile();
+        this.scene.start(SCENE_KEYS.mainMenu, { profile: updatedProfile });
+      });
+      btn.on('pointerover', () => btn.setColor('#f5e6a3'));
+      btn.on('pointerout', () => btn.setColor('#c9a44e'));
+    });
   }
 
   // ── Game Over ──
