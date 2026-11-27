@@ -131,7 +131,7 @@ export class LoginScene extends Phaser.Scene {
       try {
         const response = await apiRegister(user, pass, display);
         storeAuth(response);
-        this.scene.start(SCENE_KEYS.mainMenu, { profile: response.player });
+        this.scene.start(SCENE_KEYS.tutorial);
       } catch (err: any) {
         setError(err.message);
       } finally {

@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { connectDB } from './db';
 import authRouter from './auth';
 import gameRouter from './game';
+import guildRouter from './guild';
 
 dotenv.config();
 
@@ -19,6 +20,7 @@ async function main() {
   // Routes
   app.use('/api/auth', authRouter);
   app.use('/api/game', gameRouter);
+  app.use('/api/guild', guildRouter);
 
   // Health check
   app.get('/api/health', (_req, res) => {

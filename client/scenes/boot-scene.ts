@@ -20,7 +20,11 @@ export class BootScene extends Phaser.Scene {
     const profile = getStoredProfile();
 
     if (token && profile) {
-      this.scene.start(SCENE_KEYS.mainMenu, { profile });
+      if (!profile.tutorialDone) {
+        this.scene.start(SCENE_KEYS.tutorial);
+      } else {
+        this.scene.start(SCENE_KEYS.mainMenu, { profile });
+      }
     } else {
       this.scene.start(SCENE_KEYS.login);
     }
