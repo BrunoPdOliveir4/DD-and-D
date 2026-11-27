@@ -593,19 +593,60 @@ export class GameScene extends Phaser.Scene {
 
   private drawFloor(): void {
     const g = this.add.graphics().setDepth(0);
+    // Dark stone floor
     g.fillStyle(0x0d0d1a);
     g.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+
+    // Tile grid with alternating subtle shades
+    for (let x = 0; x < WORLD_WIDTH; x += 64) {
+      for (let y = 0; y < WORLD_HEIGHT; y += 64) {
+        const shade = ((x / 64 + y / 64) % 2 === 0) ? 0x111122 : 0x0e0e1c;
+        g.fillStyle(shade, 0.6);
+        g.fillRect(x, y, 64, 64);
+      }
+    }
+
     // Grid lines
-    g.lineStyle(1, 0x1a1a2e, 0.4);
+    g.lineStyle(1, 0x1a1a2e, 0.3);
     for (let x = 0; x <= WORLD_WIDTH; x += 64) {
       g.lineBetween(x, 0, x, WORLD_HEIGHT);
     }
     for (let y = 0; y <= WORLD_HEIGHT; y += 64) {
       g.lineBetween(0, y, WORLD_WIDTH, y);
     }
-    // Border
-    g.lineStyle(3, 0xc9a44e, 0.3);
+
+    // Corner runes (decorative)
+    const runePositions = [
+      { x: 100, y: 100 }, { x: WORLD_WIDTH - 100, y: 100 },
+      { x: 100, y: WORLD_HEIGHT - 100 }, { x: WORLD_WIDTH - 100, y: WORLD_HEIGHT - 100 },
+      { x: WORLD_WIDTH / 2, y: WORLD_HEIGHT / 2 },
+    ];
+    for (const pos of runePositions) {
+      g.lineStyle(1, 0xc9a44e, 0.08);
+      g.strokeCircle(pos.x, pos.y, 40);
+      g.strokeCircle(pos.x, pos.y, 60);
+      // Diamond
+      g.lineStyle(1, 0xc9a44e, 0.06);
+      const s = 25;
+      g.lineBetween(pos.x, pos.y - s, pos.x + s, pos.y);
+      g.lineBetween(pos.x + s, pos.y, pos.x, pos.y + s);
+      g.lineBetween(pos.x, pos.y + s, pos.x - s, pos.y);
+      g.lineBetween(pos.x - s, pos.y, pos.x, pos.y - s);
+    }
+
+    // Border with double line
+    g.lineStyle(3, 0xc9a44e, 0.25);
     g.strokeRect(10, 10, WORLD_WIDTH - 20, WORLD_HEIGHT - 20);
+    g.lineStyle(1, 0xc9a44e, 0.12);
+    g.strokeRect(20, 20, WORLD_WIDTH - 40, WORLD_HEIGHT - 40);
+
+    // Vignette darkening at edges (4 gradient rectangles)
+    const vg = this.add.graphics().setDepth(1);
+    vg.fillStyle(0x000000, 0.3);
+    vg.fillRect(0, 0, WORLD_WIDTH, 80); // top
+    vg.fillRect(0, WORLD_HEIGHT - 80, WORLD_WIDTH, 80); // bottom
+    vg.fillRect(0, 0, 80, WORLD_HEIGHT); // left
+    vg.fillRect(WORLD_WIDTH - 80, 0, 80, WORLD_HEIGHT); // right
   }
 
   // ── Game Over ──

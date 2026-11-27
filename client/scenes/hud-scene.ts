@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { SCENE_KEYS, PALETTE, GAME_WIDTH, GAME_HEIGHT } from '../config';
+import { WORLD_WIDTH, WORLD_HEIGHT } from '../systems/constants';
 import type { QuiverState } from '../systems/quiver';
 import { QUIVER_SIZE, RELOAD_MS, ARROW_COLORS, reloadProgress, currentArrow } from '../systems/quiver';
 
@@ -23,6 +24,7 @@ export class HudScene extends Phaser.Scene {
   private waveText!: Phaser.GameObjects.Text;
   private goldText!: Phaser.GameObjects.Text;
   private killText!: Phaser.GameObjects.Text;
+  private minimap!: Phaser.GameObjects.Graphics;
 
   constructor() {
     super(SCENE_KEYS.hud);
@@ -66,6 +68,9 @@ export class HudScene extends Phaser.Scene {
       this.abilitySlots.push(container);
     }
 
+    // Minimap (bottom-left)
+    this.minimap = this.add.graphics().setDepth(100);
+
     // Listen to game scene events
     const gameScene = this.scene.get(SCENE_KEYS.game);
     gameScene.events.on('hudUpdate', (data: HudData) => this.updateHud(data));
@@ -75,6 +80,7 @@ export class HudScene extends Phaser.Scene {
     this.drawHpBar(data.hp, data.maxHp);
     this.drawQuiver(data.quiver, data.time);
     this.drawAbilities(data.abilities, data.time);
+    this.drawMinimap();
     this.waveText.setText(`⚔️ Onda ${data.wave}`);
     this.goldText.setText(`🪙 ${data.gold}`);
     this.killText.setText(`💀 ${data.kills}`);
@@ -198,6 +204,42 @@ export class HudScene extends Phaser.Scene {
         }).setOrigin(0.5);
         container.add(cdText);
       }
+    }
+  }
+
+  private drawMinimap(): void {
+    this.minimap.clear();
+    const MX = 20, MY = GAME_HEIGHT - 120, MW = 100, MH = 75;
+    const scaleX = MW / WORLD_WIDTH;
+    const scaleY = MH / WORLD_HEIGHT;
+
+    // Background
+    this.minimap.fillStyle(0x0a0a0f, 0.7);
+    this.minimap.fillRoundedRect(MX, MY, MW, MH, 4);
+    this.minimap.lineStyle(1, 0xc9a44e, 0.3);
+    this.minimap.strokeRoundedRect(MX, MY, MW, MH, 4);
+
+    // Get entities from game scene
+    const gameScene = this.scene.get(SCENE_KEYS.game) as Phaser.Scene;
+    const enemies = gameScene.children?.list?.filter(
+      (c: any) => c.getData?.('d') && (c.getData('d') as any).hp > 0
+    ) ?? [];
+
+    // Enemy dots (red)
+    for (const e of enemies) {
+      const ex = MX + (e as any).x * scaleX;
+      const ey = MY + (e as any).y * scaleY;
+      this.minimap.fillStyle(0xe74c3c, 0.8);
+      this.minimap.fillCircle(ex, ey, 2);
+    }
+
+    // Player dot (green, slightly larger)
+    const player = (gameScene as any).player;
+    if (player) {
+      const px = MX + player.x * scaleX;
+      const py = MY + player.y * scaleY;
+      this.minimap.fillStyle(0x2ecc71, 1);
+      this.minimap.fillCircle(px, py, 3);
     }
   }
 }
