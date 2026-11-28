@@ -71,12 +71,13 @@ export function generatePlayerTexture(scene: Phaser.Scene, classId: ClassId): st
 
 /** Basic attack behavior per class */
 export interface BasicAttackConfig {
-  type: 'ranged' | 'melee' | 'rune';
+  type: 'ranged' | 'melee' | 'rune' | 'hybrid';
   projectileSpeed: number;
   damage: number;
   range: number;
   attackCooldownMs: number;
   color: number;
+  secondaryDamage?: number; // for hybrid: weak ranged projectile damage
 }
 
 export function getBasicAttackConfig(classId: ClassId): BasicAttackConfig {
@@ -91,9 +92,9 @@ export function getBasicAttackConfig(classId: ClassId): BasicAttackConfig {
     case 'runekeeper':
       return { type: 'rune', projectileSpeed: 350, damage: stats.attackDamage, range: stats.attackRange, attackCooldownMs: 1200, color: def.color };
     case 'riftblade':
-      return { type: 'ranged', projectileSpeed: 600, damage: stats.attackDamage, range: stats.attackRange, attackCooldownMs: 900, color: def.color };
+      return { type: 'melee', projectileSpeed: 0, damage: stats.attackDamage, range: 80, attackCooldownMs: 500, color: def.color };
     case 'trickster':
-      return { type: 'ranged', projectileSpeed: 400, damage: stats.attackDamage, range: stats.attackRange, attackCooldownMs: 700, color: def.color };
+      return { type: 'hybrid', projectileSpeed: 350, damage: stats.attackDamage, range: 70, attackCooldownMs: 600, color: def.color, secondaryDamage: 12 };
     default:
       return { type: 'ranged', projectileSpeed: 500, damage: 30, range: 200, attackCooldownMs: 800, color: 0xffffff };
   }

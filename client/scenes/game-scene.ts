@@ -168,6 +168,7 @@ export class GameScene extends Phaser.Scene {
   private hp = PLAYER_MAX_HP;
   private maxHp = PLAYER_MAX_HP;
   private alive = true;
+  private paused = false;
   private quiver: QuiverState = createQuiver();
   private abilities: AbilityState[] = [];
   private classId: ClassId = 'hunter';
@@ -208,6 +209,7 @@ export class GameScene extends Phaser.Scene {
     this.input.keyboard!.removeAllListeners();
     this.input.removeAllListeners();
     this.pauseOverlay = null;
+    this.abilities = []; // Reset so stale state doesn't persist
 
     generateTextures(this);
     const playerTex = generatePlayerTexture(this, this.classId);
@@ -300,6 +302,11 @@ export class GameScene extends Phaser.Scene {
     this.input.keyboard!.on('keydown-FOUR', () => this.useAbility(3));
     this.input.keyboard!.on('keydown-FIVE', () => this.useAbility(4));
     this.input.keyboard!.on('keydown-ESC', () => {
+      // If paused, close the menu
+      if (this.paused) {
+        this.closePauseMenu();
+        return;
+      }
       if (!this.alive) return;
       // Between waves: offer exit
       if (!this.waveActive && this.wave > 0) {
@@ -318,7 +325,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(time: number, _delta: number): void {
-    if (!this.alive) return;
+    if (!this.alive || this.paused) return;
 
     // Reload tick
     this.quiver = tickReload(this.quiver, time);
@@ -466,7 +473,7 @@ export class GameScene extends Phaser.Scene {
     const worldPoint = this.cameras.main.getWorldPoint(this.pointer.x, this.pointer.y);
     const angle = Phaser.Math.Angle.Between(this.player.x, this.player.y, worldPoint.x, worldPoint.y);
 
-    if (this.attackConfig.type === 'melee') {
+    if (this.attackConfig.type === 'melee' || this.attackConfig.type === 'hybrid') {
       // Melee arc attack
       const arcRange = this.attackConfig.range;
       const halfAngle = Math.PI / 3;
@@ -491,6 +498,27 @@ export class GameScene extends Phaser.Scene {
         }
       });
       this.cameras.main.shake(60, 0.003);
+
+      // Hybrid: also fire weak ranged projectile
+      if (this.attackConfig.type === 'hybrid' && this.attackConfig.secondaryDamage) {
+        const projKey = `proj_${this.classId}_weak`;
+        if (!this.textures.exists(projKey)) {
+          const g = this.make.graphics({ x: 0, y: 0 }, false);
+          g.fillStyle(this.attackConfig.color, 0.5);
+          g.fillRect(0, 0, 8, 3);
+          g.generateTexture(projKey, 8, 3);
+          g.destroy();
+        }
+        const proj = this.physics.add.sprite(this.player.x, this.player.y, projKey);
+        proj.setRotation(angle);
+        proj.setData('type', 'generic');
+        proj.setData('genericDamage', this.attackConfig.secondaryDamage);
+        this.arrows.add(proj);
+        (proj.body as Phaser.Physics.Arcade.Body).setVelocity(
+          Math.cos(angle) * this.attackConfig.projectileSpeed,
+          Math.sin(angle) * this.attackConfig.projectileSpeed,
+        );
+      }
     } else {
       // Ranged projectile (generic)
       const g = this.make.graphics({ x: 0, y: 0 }, false);
@@ -518,7 +546,7 @@ export class GameScene extends Phaser.Scene {
   // ── Abilities ──
 
   private useAbility(index: number): void {
-    if (!this.alive || index >= this.abilities.length) return;
+    if (!this.alive || this.paused || index >= this.abilities.length) return;
     const ab = this.abilities[index];
     const now = this.time.now;
     if (now - ab.lastUsedMs < ab.cooldownMs) return;
@@ -529,26 +557,86 @@ export class GameScene extends Phaser.Scene {
       case 'rain': this.abilityRainOfArrows(); break;
       case 'roll': this.abilityEvasiveRoll(); break;
       case 'pierce': this.abilityPiercingShot(); break;
+      case 'eagle_eye': this.abilityEagleEye(); break;
+      case 'arrow_storm': this.abilityArrowStorm(); break;
+      case 'wild_instinct': this.abilityWildInstinct(); break;
+      case 'double_shot': this.abilityDoubleShot(); break;
+      case 'bear_trap': this.abilityBearTrap(); break;
+      case 'camouflage': this.abilityCamouflage(); break;
+      case 'falcon_stance': this.abilityFalconStance(); break;
+      case 'homing_arrow': this.abilityHomingArrow(); break;
+      case 'final_burst': this.abilityFinalBurst(); break;
+      case 'explosive_arrow': this.abilityExplosiveArrow(); break;
+      case 'quick_reload': this.abilityQuickReload(); break;
+      case 'prey_mark': this.abilityPreyMark(); break;
 
       // ── Berserker ──
       case 'cleave': this.abilityCleave(); break;
       case 'charge': this.abilityCharge(); break;
       case 'war_cry': this.abilityWarCry(); break;
+      case 'axe_throw': this.abilityAxeThrow(); break;
+      case 'whirlwind': this.abilityWhirlwind(); break;
+      case 'bloodlust': this.abilityBloodlust(); break;
+      case 'fury_slam': this.abilityFurySlam(); break;
+      case 'execute': this.abilityExecute(); break;
+      case 'iron_skin': this.abilityIronSkin(); break;
+      case 'intimidate': this.abilityIntimidate(); break;
+      case 'undying': this.abilityUndying(); break;
+      case 'berserker_rage': this.abilityBerserkerRage(); break;
+      case 'ground_pound': this.abilityGroundPound(); break;
+      case 'avatar_of_war': this.abilityAvatarOfWar(); break;
+      case 'rampage': this.abilityRampage(); break;
 
       // ── Runekeeper ──
       case 'frost_rune': this.abilityFrostRune(); break;
       case 'fire_rune': this.abilityFireRune(); break;
       case 'teleport': this.abilityTeleport(); break;
+      case 'arcane_bolt': this.abilityArcaneBolt(); break;
+      case 'chain_lightning': this.abilityChainLightning(); break;
+      case 'rune_shield': this.abilityRuneShield(); break;
+      case 'summon_golem': this.abilitySummonGolem(); break;
+      case 'mana_drain': this.abilityManaDrain(); break;
+      case 'summon_wisp': this.abilitySummonWisp(); break;
+      case 'time_warp': this.abilityTimeWarp(); break;
+      case 'rune_trap': this.abilityRuneTrap(); break;
+      case 'meteor': this.abilityMeteor(); break;
+      case 'rune_overload': this.abilityRuneOverload(); break;
+      case 'elemental_fusion': this.abilityElementalFusion(); break;
+      case 'arcane_singularity': this.abilityArcaneSingularity(); break;
 
       // ── Riftblade ──
       case 'blink_strike': this.abilityBlinkStrike(); break;
       case 'shadow_step': this.abilityShadowStep(); break;
       case 'void_mark': this.abilityVoidMark(); break;
+      case 'shadow_blade': this.abilityShadowBlade(); break;
+      case 'phase_shift': this.abilityPhaseShift(); break;
+      case 'spatial_rift': this.abilitySpatialRift(); break;
+      case 'void_eruption': this.abilityVoidEruption(); break;
+      case 'clone_assault': this.abilityCloneAssault(); break;
+      case 'dimensional_slash': this.abilityDimensionalSlash(); break;
+      case 'void_anchor': this.abilityVoidAnchor(); break;
+      case 'gravity_well': this.abilityGravityWell(); break;
+      case 'temporal_rewind': this.abilityTemporalRewind(); break;
+      case 'assassinate': this.abilityAssassinate(); break;
+      case 'mirror_dimension': this.abilityMirrorDimension(); break;
+      case 'reality_shatter': this.abilityRealityShatter(); break;
 
       // ── Trickster ──
       case 'juggle': this.abilityJuggle(); break;
       case 'smoke_mirror': this.abilitySmokeMirror(); break;
       case 'tumble': this.abilityTumble(); break;
+      case 'poison_flask': this.abilityPoisonFlask(); break;
+      case 'card_trick': this.abilityCardTrick(); break;
+      case 'vanish': this.abilityVanish(); break;
+      case 'explosive_confetti': this.abilityExplosiveConfetti(); break;
+      case 'knife_rain': this.abilityKnifeRain(); break;
+      case 'grand_finale': this.abilityGrandFinale(); break;
+      case 'swap': this.abilitySwap(); break;
+      case 'puppet_show': this.abilityPuppetShow(); break;
+      case 'lucky_coin': this.abilityLuckyCoin(); break;
+      case 'hall_of_mirrors': this.abilityHallOfMirrors(); break;
+      case 'chaos_roulette': this.abilityChaosRoulette(); break;
+      case 'curtain_call': this.abilityCurtainCall(); break;
     }
   }
 
@@ -984,6 +1072,826 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  // ── Hunter extra abilities ──
+
+  private abilityEagleEye(): void {
+    // Zoom out + highlight enemies for 5s
+    this.cameras.main.zoomTo(0.7, 300);
+    this.enemies.getChildren().forEach(obj => {
+      const e = obj as Phaser.Physics.Arcade.Sprite;
+      const mark = this.add.circle(e.x, e.y, 20, 0xffff00, 0.3).setDepth(50);
+      this.tweens.add({ targets: mark, alpha: 0, duration: 5000, onComplete: () => mark.destroy() });
+    });
+    this.time.delayedCall(5000, () => this.cameras.main.zoomTo(1, 300));
+  }
+
+  private abilityArrowStorm(): void {
+    // Massive barrage - 20 arrows in all directions
+    for (let i = 0; i < 20; i++) {
+      const ang = (Math.PI * 2 / 20) * i;
+      const a = this.physics.add.sprite(this.player.x, this.player.y, TEX.arrowPoison);
+      a.setRotation(ang); a.setData('damage', 18);
+      this.rainArrows.add(a);
+      (a.body as Phaser.Physics.Arcade.Body).setVelocity(Math.cos(ang) * 350, Math.sin(ang) * 350);
+      this.time.delayedCall(1200, () => { if (a.active) a.destroy(); });
+    }
+    this.cameras.main.shake(100, 0.005);
+  }
+
+  private abilityWildInstinct(): void {
+    // Speed + attack speed boost for 6s
+    const flash = this.add.circle(this.player.x, this.player.y, 50, 0x2ecc71, 0.4).setDepth(5);
+    this.tweens.add({ targets: flash, scale: 2, alpha: 0, duration: 400, onComplete: () => flash.destroy() });
+    const origCD = this.attackConfig.attackCooldownMs;
+    this.attackConfig.attackCooldownMs = Math.floor(origCD * 0.5);
+    this.player.setTint(0x2ecc71);
+    this.time.delayedCall(6000, () => { this.attackConfig.attackCooldownMs = origCD; this.player.clearTint(); });
+  }
+
+  private abilityDoubleShot(): void {
+    const wp = this.cameras.main.getWorldPoint(this.pointer.x, this.pointer.y);
+    const angle = Phaser.Math.Angle.Between(this.player.x, this.player.y, wp.x, wp.y);
+    for (const offset of [-0.1, 0.1]) {
+      const a = this.physics.add.sprite(this.player.x, this.player.y, TEX.arrowPoison);
+      a.setRotation(angle + offset); a.setData('damage', 30);
+      this.rainArrows.add(a);
+      (a.body as Phaser.Physics.Arcade.Body).setVelocity(Math.cos(angle + offset) * 500, Math.sin(angle + offset) * 500);
+      this.time.delayedCall(1500, () => { if (a.active) a.destroy(); });
+    }
+  }
+
+  private abilityBearTrap(): void {
+    const wp = this.cameras.main.getWorldPoint(this.pointer.x, this.pointer.y);
+    const trap = this.add.circle(wp.x, wp.y, 18, 0x8B4513, 0.6).setDepth(4);
+    const zone = this.add.zone(wp.x, wp.y, 36, 36); this.physics.add.existing(zone, true);
+    this.physics.add.overlap(zone, this.enemies, (_z, eObj) => {
+      const e = eObj as Phaser.Physics.Arcade.Sprite; const d = e.getData('d') as EnemyData;
+      if (d && d.hp > 0) { (e.body as Phaser.Physics.Arcade.Body).setVelocity(0, 0); e.setTint(0x8B4513);
+        this.time.delayedCall(2500, () => { if (e.active) e.clearTint(); });
+        this.damageEnemy(e, d, 35, this.time.now, { x: wp.x, y: wp.y }); trap.destroy(); zone.destroy(); }
+    });
+    this.time.delayedCall(10000, () => { if (trap.active) trap.destroy(); if (zone.active) zone.destroy(); });
+  }
+
+  private abilityCamouflage(): void {
+    this.player.setAlpha(0.2);
+    (this.player.body as Phaser.Physics.Arcade.Body).checkCollision.none = true;
+    const flash = this.add.circle(this.player.x, this.player.y, 30, 0x228B22, 0.5).setDepth(5);
+    this.tweens.add({ targets: flash, scale: 2, alpha: 0, duration: 500, onComplete: () => flash.destroy() });
+    this.time.delayedCall(3000, () => {
+      this.player.setAlpha(1); (this.player.body as Phaser.Physics.Arcade.Body).checkCollision.none = false;
+    });
+  }
+
+  private abilityFalconStance(): void {
+    // Increased damage + range for 5s
+    const origDmg = this.attackConfig.damage;
+    this.attackConfig.damage = Math.floor(origDmg * 1.8);
+    this.player.setTint(0xf39c12);
+    const aura = this.add.circle(this.player.x, this.player.y, 40, 0xf39c12, 0.3).setDepth(4);
+    this.tweens.add({ targets: aura, scale: 1.5, alpha: 0, duration: 5000, onComplete: () => aura.destroy() });
+    this.time.delayedCall(5000, () => { this.attackConfig.damage = origDmg; this.player.clearTint(); });
+  }
+
+  private abilityHomingArrow(): void {
+    const nearest = this.findNearestEnemy();
+    if (!nearest) return;
+    const a = this.physics.add.sprite(this.player.x, this.player.y, TEX.arrowStun);
+    a.setData('damage', 55); this.rainArrows.add(a);
+    this.tweens.add({ targets: a, x: nearest.x, y: nearest.y, duration: 400, onComplete: () => {
+      const d = nearest.getData('d') as EnemyData;
+      if (d && d.hp > 0) this.damageEnemy(nearest, d, 55, this.time.now, { x: a.x, y: a.y });
+      a.destroy();
+    }});
+  }
+
+  private abilityFinalBurst(): void {
+    // Rapid-fire 8 arrows forward
+    const wp = this.cameras.main.getWorldPoint(this.pointer.x, this.pointer.y);
+    const angle = Phaser.Math.Angle.Between(this.player.x, this.player.y, wp.x, wp.y);
+    for (let i = 0; i < 8; i++) {
+      this.time.delayedCall(i * 80, () => {
+        const spread = (Math.random() - 0.5) * 0.15;
+        const a = this.physics.add.sprite(this.player.x, this.player.y, TEX.arrowPoison);
+        a.setRotation(angle + spread); a.setData('damage', 20);
+        this.rainArrows.add(a);
+        (a.body as Phaser.Physics.Arcade.Body).setVelocity(Math.cos(angle + spread) * 550, Math.sin(angle + spread) * 550);
+        this.time.delayedCall(1200, () => { if (a.active) a.destroy(); });
+      });
+    }
+  }
+
+  private abilityExplosiveArrow(): void {
+    const wp = this.cameras.main.getWorldPoint(this.pointer.x, this.pointer.y);
+    const angle = Phaser.Math.Angle.Between(this.player.x, this.player.y, wp.x, wp.y);
+    const a = this.physics.add.sprite(this.player.x, this.player.y, TEX.arrowPoison);
+    a.setRotation(angle); this.rainArrows.add(a);
+    (a.body as Phaser.Physics.Arcade.Body).setVelocity(Math.cos(angle) * 400, Math.sin(angle) * 400);
+    this.time.delayedCall(600, () => {
+      if (!a.active) return;
+      const ex = a.x, ey = a.y; a.destroy();
+      const boom = this.add.circle(ex, ey, 60, 0xff6600, 0.5).setDepth(10);
+      this.tweens.add({ targets: boom, scale: 1.5, alpha: 0, duration: 300, onComplete: () => boom.destroy() });
+      this.cameras.main.shake(80, 0.006);
+      this.aoeHit(ex, ey, 60, 50);
+    });
+  }
+
+  private abilityQuickReload(): void {
+    this.quiver = createQuiver();
+    const flash = this.add.circle(this.player.x, this.player.y, 25, 0xf1c40f, 0.5).setDepth(5);
+    this.tweens.add({ targets: flash, scale: 1.5, alpha: 0, duration: 300, onComplete: () => flash.destroy() });
+  }
+
+  private abilityPreyMark(): void {
+    const nearest = this.findNearestEnemy();
+    if (!nearest) return;
+    const d = nearest.getData('d') as EnemyData; if (!d) return;
+    nearest.setTint(0xff0000);
+    const mark = this.add.text(nearest.x, nearest.y - 20, '🎯', { fontSize: '16px' }).setOrigin(0.5).setDepth(50);
+    // Marked takes 2x damage for 5s
+    const origHp = d.hp;
+    this.damageEnemy(nearest, d, 20, this.time.now, { x: this.player.x, y: this.player.y });
+    this.time.delayedCall(5000, () => { if (nearest.active) nearest.clearTint(); if (mark.active) mark.destroy(); });
+  }
+
+  // ── Berserker extra abilities ──
+
+  private abilityAxeThrow(): void {
+    const wp = this.cameras.main.getWorldPoint(this.pointer.x, this.pointer.y);
+    const angle = Phaser.Math.Angle.Between(this.player.x, this.player.y, wp.x, wp.y);
+    const axe = this.physics.add.sprite(this.player.x, this.player.y, 'player');
+    axe.setTint(0xe74c3c); axe.setScale(0.8); axe.setData('damage', 45);
+    this.rainArrows.add(axe);
+    (axe.body as Phaser.Physics.Arcade.Body).setVelocity(Math.cos(angle) * 400, Math.sin(angle) * 400);
+    this.tweens.add({ targets: axe, rotation: axe.rotation + Math.PI * 4, duration: 800 });
+    this.time.delayedCall(1000, () => { if (axe.active) axe.destroy(); });
+  }
+
+  private abilityWhirlwind(): void {
+    // Spin dealing damage to all nearby enemies over 1.5s
+    let ticks = 0;
+    const timer = this.time.addEvent({ delay: 200, repeat: 7, callback: () => {
+      const arc = this.add.graphics().setDepth(12);
+      arc.fillStyle(0xe74c3c, 0.25);
+      arc.fillCircle(this.player.x, this.player.y, 90);
+      this.tweens.add({ targets: arc, alpha: 0, duration: 200, onComplete: () => arc.destroy() });
+      this.aoeHit(this.player.x, this.player.y, 90, 15);
+      ticks++;
+    }});
+    this.cameras.main.shake(200, 0.003);
+  }
+
+  private abilityBloodlust(): void {
+    // Heal 30% HP + lifesteal for 5s
+    this.hp = Math.min(this.maxHp, this.hp + this.maxHp * 0.3);
+    this.player.setTint(0xcc0000);
+    const splash = this.add.circle(this.player.x, this.player.y, 40, 0xcc0000, 0.4).setDepth(5);
+    this.tweens.add({ targets: splash, scale: 2, alpha: 0, duration: 500, onComplete: () => splash.destroy() });
+    this.time.delayedCall(5000, () => this.player.clearTint());
+  }
+
+  private abilityFurySlam(): void {
+    // Ground slam — AOE around player
+    const slam = this.add.circle(this.player.x, this.player.y, 100, 0xe74c3c, 0.4).setDepth(5);
+    this.tweens.add({ targets: slam, scale: 1.5, alpha: 0, duration: 400, onComplete: () => slam.destroy() });
+    this.aoeHit(this.player.x, this.player.y, 100, 55);
+    this.cameras.main.shake(120, 0.008);
+  }
+
+  private abilityExecute(): void {
+    // High damage to low-HP enemy
+    const nearest = this.findNearestEnemy();
+    if (!nearest) return;
+    const d = nearest.getData('d') as EnemyData; if (!d) return;
+    const dmg = d.hp < d.maxHp * 0.3 ? 150 : 50;
+    this.damageEnemy(nearest, d, dmg, this.time.now, { x: this.player.x, y: this.player.y });
+    const slash = this.add.graphics().setDepth(15);
+    slash.lineStyle(3, 0xff0000, 0.8);
+    slash.lineBetween(this.player.x, this.player.y, nearest.x, nearest.y);
+    this.tweens.add({ targets: slash, alpha: 0, duration: 300, onComplete: () => slash.destroy() });
+  }
+
+  private abilityIronSkin(): void {
+    // Damage reduction for 4s (simulated by temp HP boost)
+    const bonus = Math.floor(this.maxHp * 0.4);
+    this.maxHp += bonus; this.hp += bonus;
+    this.player.setTint(0x888888);
+    const shield = this.add.circle(this.player.x, this.player.y, 30, 0xaaaaaa, 0.3).setDepth(4);
+    this.tweens.add({ targets: shield, alpha: 0, duration: 4000, onComplete: () => { shield.destroy(); this.maxHp -= bonus; this.hp = Math.min(this.hp, this.maxHp); this.player.clearTint(); }});
+  }
+
+  private abilityIntimidate(): void {
+    // Push all nearby enemies back + slow
+    const range = 150;
+    this.enemies.getChildren().forEach(obj => {
+      const e = obj as Phaser.Physics.Arcade.Sprite;
+      const d = Phaser.Math.Distance.Between(this.player.x, this.player.y, e.x, e.y);
+      if (d < range) {
+        const ang = Phaser.Math.Angle.Between(this.player.x, this.player.y, e.x, e.y);
+        (e.body as Phaser.Physics.Arcade.Body).setVelocity(Math.cos(ang) * 300, Math.sin(ang) * 300);
+        e.setTint(0x666666);
+        this.time.delayedCall(2000, () => { if (e.active) e.clearTint(); });
+      }
+    });
+    const wave = this.add.circle(this.player.x, this.player.y, 20, 0xf39c12, 0.3).setDepth(5);
+    this.tweens.add({ targets: wave, scale: range / 20, alpha: 0, duration: 400, onComplete: () => wave.destroy() });
+    this.cameras.main.shake(80, 0.004);
+  }
+
+  private abilityUndying(): void {
+    // Revive to 50% HP on next lethal hit (5s window)
+    this.player.setTint(0xffd700);
+    const originalHp = this.hp;
+    // Store a flag
+    this.player.setData('undying', true);
+    this.time.delayedCall(5000, () => { this.player.setData('undying', false); this.player.clearTint(); });
+  }
+
+  private abilityBerserkerRage(): void {
+    // Double damage for 4s, take 25% more
+    const origDmg = this.attackConfig.damage;
+    this.attackConfig.damage = origDmg * 2;
+    this.player.setTint(0xff0000);
+    const aura = this.add.circle(this.player.x, this.player.y, 35, 0xff0000, 0.3).setDepth(4);
+    this.tweens.add({ targets: aura, scale: 2, alpha: 0, duration: 4000, onComplete: () => aura.destroy() });
+    this.time.delayedCall(4000, () => { this.attackConfig.damage = origDmg; this.player.clearTint(); });
+  }
+
+  private abilityGroundPound(): void {
+    // Large AOE shockwave
+    const ring = this.add.circle(this.player.x, this.player.y, 20, 0xe74c3c, 0.5).setDepth(5);
+    this.tweens.add({ targets: ring, scale: 8, alpha: 0, duration: 500, onComplete: () => ring.destroy() });
+    this.aoeHit(this.player.x, this.player.y, 160, 40);
+    this.cameras.main.shake(200, 0.012);
+  }
+
+  private abilityAvatarOfWar(): void {
+    // All stats boosted for 8s
+    const origDmg = this.attackConfig.damage;
+    const origCD = this.attackConfig.attackCooldownMs;
+    this.attackConfig.damage = Math.floor(origDmg * 1.5);
+    this.attackConfig.attackCooldownMs = Math.floor(origCD * 0.5);
+    this.player.setTint(0xff4444); this.player.setScale(1.3);
+    this.time.delayedCall(8000, () => {
+      this.attackConfig.damage = origDmg; this.attackConfig.attackCooldownMs = origCD;
+      this.player.clearTint(); this.player.setScale(1);
+    });
+  }
+
+  private abilityRampage(): void {
+    // Dash through enemies 3 times
+    for (let i = 0; i < 3; i++) {
+      this.time.delayedCall(i * 300, () => {
+        const nearest = this.findNearestEnemy();
+        if (!nearest) return;
+        this.tweens.add({ targets: this.player, x: nearest.x, y: nearest.y, duration: 100, onComplete: () => {
+          const d = nearest.getData('d') as EnemyData;
+          if (d && d.hp > 0) this.damageEnemy(nearest, d, 35, this.time.now, { x: this.player.x, y: this.player.y });
+          this.cameras.main.shake(50, 0.004);
+        }});
+      });
+    }
+  }
+
+  // ── Runekeeper extra abilities ──
+
+  private abilityArcaneBolt(): void {
+    const wp = this.cameras.main.getWorldPoint(this.pointer.x, this.pointer.y);
+    const angle = Phaser.Math.Angle.Between(this.player.x, this.player.y, wp.x, wp.y);
+    const bolt = this.physics.add.sprite(this.player.x, this.player.y, 'player');
+    bolt.setTint(0x9b59b6); bolt.setScale(0.6); bolt.setData('damage', 35);
+    this.rainArrows.add(bolt);
+    (bolt.body as Phaser.Physics.Arcade.Body).setVelocity(Math.cos(angle) * 450, Math.sin(angle) * 450);
+    this.time.delayedCall(1500, () => { if (bolt.active) bolt.destroy(); });
+  }
+
+  private abilityChainLightning(): void {
+    let current = this.findNearestEnemy();
+    const hit = new Set<Phaser.Physics.Arcade.Sprite>();
+    for (let i = 0; i < 5 && current; i++) {
+      hit.add(current);
+      const d = current.getData('d') as EnemyData;
+      if (d && d.hp > 0) {
+        this.damageEnemy(current, d, 25, this.time.now, { x: this.player.x, y: this.player.y });
+        current.setTint(0xffff00);
+        this.time.delayedCall(500, () => { if (current!.active) current!.clearTint(); });
+      }
+      const prevPos = { x: current.x, y: current.y };
+      const line = this.add.graphics().setDepth(15);
+      // Find next nearest not in hit set
+      let next: Phaser.Physics.Arcade.Sprite | null = null; let minD = 200;
+      this.enemies.getChildren().forEach(obj => {
+        const e = obj as Phaser.Physics.Arcade.Sprite;
+        if (hit.has(e)) return;
+        const dd = Phaser.Math.Distance.Between(prevPos.x, prevPos.y, e.x, e.y);
+        if (dd < minD) { minD = dd; next = e; }
+      });
+      if (next) {
+        line.lineStyle(2, 0xffff00, 0.8);
+        line.lineBetween(prevPos.x, prevPos.y, (next as any).x, (next as any).y);
+        this.tweens.add({ targets: line, alpha: 0, duration: 400, onComplete: () => line.destroy() });
+      }
+      current = next;
+    }
+  }
+
+  private abilityRuneShield(): void {
+    const shield = this.add.circle(this.player.x, this.player.y, 35, 0x3498db, 0.35).setDepth(15);
+    const bonus = 80; this.hp = Math.min(this.maxHp + bonus, this.hp + bonus); this.maxHp += bonus;
+    this.tweens.add({ targets: shield, alpha: 0, duration: 5000, onComplete: () => { shield.destroy(); this.maxHp -= bonus; this.hp = Math.min(this.hp, this.maxHp); }});
+  }
+
+  private abilitySummonGolem(): void {
+    const gx = this.player.x + (Math.random() - 0.5) * 60;
+    const gy = this.player.y + (Math.random() - 0.5) * 60;
+    const golem = this.add.circle(gx, gy, 20, 0x8B4513, 0.9).setDepth(10);
+    // Golem attacks nearby enemies every 1s for 8s
+    const timer = this.time.addEvent({ delay: 1000, repeat: 7, callback: () => {
+      this.aoeHit(golem.x, golem.y, 60, 20);
+      const aoe = this.add.circle(golem.x, golem.y, 60, 0x8B4513, 0.15).setDepth(5);
+      this.tweens.add({ targets: aoe, alpha: 0, duration: 300, onComplete: () => aoe.destroy() });
+    }});
+    this.time.delayedCall(8000, () => { golem.destroy(); timer.remove(); });
+  }
+
+  private abilityManaDrain(): void {
+    // Drain enemies in area, reduce their speed + heal player
+    this.aoeHit(this.player.x, this.player.y, 120, 20);
+    this.hp = Math.min(this.maxHp, this.hp + 40);
+    const drain = this.add.circle(this.player.x, this.player.y, 120, 0x9b59b6, 0.3).setDepth(5);
+    this.tweens.add({ targets: drain, alpha: 0, scale: 0.5, duration: 600, onComplete: () => drain.destroy() });
+  }
+
+  private abilitySummonWisp(): void {
+    // Wisp orbits player + damages nearby enemies for 6s
+    const wisp = this.add.circle(this.player.x + 50, this.player.y, 8, 0x00ffff, 0.8).setDepth(15);
+    let angle = 0;
+    const timer = this.time.addEvent({ delay: 100, repeat: 59, callback: () => {
+      angle += 0.15;
+      wisp.setPosition(this.player.x + Math.cos(angle) * 50, this.player.y + Math.sin(angle) * 50);
+      if (Math.random() < 0.3) this.aoeHit(wisp.x, wisp.y, 30, 8);
+    }});
+    this.time.delayedCall(6000, () => { wisp.destroy(); timer.remove(); });
+  }
+
+  private abilityTimeWarp(): void {
+    // Slow all enemies for 3s
+    this.enemies.getChildren().forEach(obj => {
+      const e = obj as Phaser.Physics.Arcade.Sprite;
+      const body = e.body as Phaser.Physics.Arcade.Body;
+      body.setVelocity(body.velocity.x * 0.2, body.velocity.y * 0.2);
+      e.setTint(0x3498db);
+      this.time.delayedCall(3000, () => { if (e.active) e.clearTint(); });
+    });
+    const ripple = this.add.circle(this.player.x, this.player.y, 50, 0x3498db, 0.2).setDepth(5);
+    this.tweens.add({ targets: ripple, scale: 6, alpha: 0, duration: 800, onComplete: () => ripple.destroy() });
+  }
+
+  private abilityRuneTrap(): void {
+    const wp = this.cameras.main.getWorldPoint(this.pointer.x, this.pointer.y);
+    const rune = this.add.circle(wp.x, wp.y, 22, 0x9b59b6, 0.4).setDepth(4);
+    const zone = this.add.zone(wp.x, wp.y, 44, 44); this.physics.add.existing(zone, true);
+    this.physics.add.overlap(zone, this.enemies, () => {
+      this.aoeHit(wp.x, wp.y, 70, 60); rune.destroy(); zone.destroy();
+      const boom = this.add.circle(wp.x, wp.y, 70, 0x9b59b6, 0.5).setDepth(10);
+      this.tweens.add({ targets: boom, scale: 1.5, alpha: 0, duration: 300, onComplete: () => boom.destroy() });
+      this.cameras.main.shake(80, 0.005);
+    });
+    this.time.delayedCall(12000, () => { if (rune.active) rune.destroy(); if (zone.active) zone.destroy(); });
+  }
+
+  private abilityMeteor(): void {
+    const wp = this.cameras.main.getWorldPoint(this.pointer.x, this.pointer.y);
+    const telegraph = this.add.circle(wp.x, wp.y, 80, 0xff4500, 0.15).setDepth(5);
+    this.tweens.add({ targets: telegraph, alpha: 0.4, duration: 800, onComplete: () => {
+      telegraph.destroy();
+      const impact = this.add.circle(wp.x, wp.y, 80, 0xff4500, 0.6).setDepth(10);
+      this.tweens.add({ targets: impact, scale: 1.5, alpha: 0, duration: 400, onComplete: () => impact.destroy() });
+      this.aoeHit(wp.x, wp.y, 80, 90);
+      this.cameras.main.shake(200, 0.015);
+    }});
+  }
+
+  private abilityRuneOverload(): void {
+    // Explosion centered on player, damages everything in range
+    const blast = this.add.circle(this.player.x, this.player.y, 30, 0xffd700, 0.6).setDepth(10);
+    this.tweens.add({ targets: blast, scale: 5, alpha: 0, duration: 500, onComplete: () => blast.destroy() });
+    this.aoeHit(this.player.x, this.player.y, 150, 70);
+    this.cameras.main.shake(150, 0.01);
+  }
+
+  private abilityElementalFusion(): void {
+    // Fire + Ice combo — AOE freeze + burn
+    const wp = this.cameras.main.getWorldPoint(this.pointer.x, this.pointer.y);
+    const fire = this.add.circle(wp.x, wp.y, 60, 0xff4500, 0.4).setDepth(10);
+    const ice = this.add.circle(wp.x, wp.y, 60, 0x00bfff, 0.4).setDepth(10);
+    this.tweens.add({ targets: fire, scale: 1.5, alpha: 0, duration: 500, onComplete: () => fire.destroy() });
+    this.tweens.add({ targets: ice, scale: 1.5, alpha: 0, duration: 500, delay: 200, onComplete: () => ice.destroy() });
+    this.aoeHit(wp.x, wp.y, 90, 80);
+    this.enemies.getChildren().forEach(obj => {
+      const e = obj as Phaser.Physics.Arcade.Sprite;
+      if (Phaser.Math.Distance.Between(wp.x, wp.y, e.x, e.y) < 90) {
+        (e.body as Phaser.Physics.Arcade.Body).setVelocity(0, 0); e.setTint(0x00bfff);
+        this.time.delayedCall(2000, () => { if (e.active) e.clearTint(); });
+      }
+    });
+  }
+
+  private abilityArcaneSingularity(): void {
+    // Black hole that pulls enemies in
+    const wp = this.cameras.main.getWorldPoint(this.pointer.x, this.pointer.y);
+    const hole = this.add.circle(wp.x, wp.y, 15, 0x000000, 0.9).setDepth(15);
+    const ring = this.add.circle(wp.x, wp.y, 15, 0x9b59b6, 0.5).setDepth(14);
+    const timer = this.time.addEvent({ delay: 100, repeat: 39, callback: () => {
+      this.enemies.getChildren().forEach(obj => {
+        const e = obj as Phaser.Physics.Arcade.Sprite;
+        const d = Phaser.Math.Distance.Between(wp.x, wp.y, e.x, e.y);
+        if (d < 150) {
+          const ang = Phaser.Math.Angle.Between(e.x, e.y, wp.x, wp.y);
+          (e.body as Phaser.Physics.Arcade.Body).setVelocity(Math.cos(ang) * 150, Math.sin(ang) * 150);
+        }
+      });
+    }});
+    this.tweens.add({ targets: ring, scale: 10, alpha: 0, duration: 4000 });
+    this.time.delayedCall(4000, () => {
+      this.aoeHit(wp.x, wp.y, 100, 100); hole.destroy(); ring.destroy(); timer.remove();
+      this.cameras.main.shake(200, 0.012);
+    });
+  }
+
+  // ── Riftblade extra abilities ──
+
+  private abilityShadowBlade(): void {
+    const wp = this.cameras.main.getWorldPoint(this.pointer.x, this.pointer.y);
+    const angle = Phaser.Math.Angle.Between(this.player.x, this.player.y, wp.x, wp.y);
+    // Fast slash in direction
+    const slash = this.add.graphics().setDepth(15);
+    slash.fillStyle(0x9b59b6, 0.5);
+    slash.slice(this.player.x, this.player.y, 100, angle - 0.4, angle + 0.4, false);
+    slash.fillPath();
+    this.tweens.add({ targets: slash, alpha: 0, duration: 200, onComplete: () => slash.destroy() });
+    this.aoeDirectional(this.player.x, this.player.y, angle, 100, 0.4, 40);
+  }
+
+  private abilityPhaseShift(): void {
+    // Teleport short distance + invulnerable 1s
+    const wp = this.cameras.main.getWorldPoint(this.pointer.x, this.pointer.y);
+    const angle = Phaser.Math.Angle.Between(this.player.x, this.player.y, wp.x, wp.y);
+    const dist = 180;
+    this.player.setPosition(
+      Phaser.Math.Clamp(this.player.x + Math.cos(angle) * dist, 30, WORLD_WIDTH - 30),
+      Phaser.Math.Clamp(this.player.y + Math.sin(angle) * dist, 30, WORLD_HEIGHT - 30)
+    );
+    this.player.setAlpha(0.3);
+    (this.player.body as Phaser.Physics.Arcade.Body).checkCollision.none = true;
+    const ghost = this.add.circle(this.player.x, this.player.y, 25, 0x9b59b6, 0.4).setDepth(5);
+    this.tweens.add({ targets: ghost, scale: 2, alpha: 0, duration: 500, onComplete: () => ghost.destroy() });
+    this.time.delayedCall(1000, () => {
+      this.player.setAlpha(1); (this.player.body as Phaser.Physics.Arcade.Body).checkCollision.none = false;
+    });
+  }
+
+  private abilitySpatialRift(): void {
+    // Create a rift that damages enemies passing through it
+    const wp = this.cameras.main.getWorldPoint(this.pointer.x, this.pointer.y);
+    const rift = this.add.ellipse(wp.x, wp.y, 20, 60, 0x9b59b6, 0.6).setDepth(10);
+    const timer = this.time.addEvent({ delay: 500, repeat: 11, callback: () => {
+      this.aoeHit(wp.x, wp.y, 40, 20);
+    }});
+    this.tweens.add({ targets: rift, scaleX: 2, duration: 6000 });
+    this.time.delayedCall(6000, () => { rift.destroy(); timer.remove(); });
+  }
+
+  private abilityVoidEruption(): void {
+    // Explosion at target
+    const wp = this.cameras.main.getWorldPoint(this.pointer.x, this.pointer.y);
+    const blast = this.add.circle(wp.x, wp.y, 50, 0x6a0dad, 0.6).setDepth(10);
+    this.tweens.add({ targets: blast, scale: 2, alpha: 0, duration: 400, onComplete: () => blast.destroy() });
+    this.aoeHit(wp.x, wp.y, 100, 65);
+    this.cameras.main.shake(100, 0.008);
+  }
+
+  private abilityCloneAssault(): void {
+    // 3 shadow clones dash to nearest enemies
+    for (let i = 0; i < 3; i++) {
+      this.time.delayedCall(i * 200, () => {
+        const clone = this.add.circle(this.player.x, this.player.y, PLAYER_RADIUS, 0x9b59b6, 0.5).setDepth(10);
+        const target = this.findNearestEnemy();
+        if (target) {
+          this.tweens.add({ targets: clone, x: target.x, y: target.y, duration: 200, onComplete: () => {
+            const d = target.getData('d') as EnemyData;
+            if (d && d.hp > 0) this.damageEnemy(target, d, 30, this.time.now, { x: clone.x, y: clone.y });
+            clone.destroy();
+          }});
+        } else { clone.destroy(); }
+      });
+    }
+  }
+
+  private abilityDimensionalSlash(): void {
+    // Wide slash that hits everything in a line
+    const wp = this.cameras.main.getWorldPoint(this.pointer.x, this.pointer.y);
+    const angle = Phaser.Math.Angle.Between(this.player.x, this.player.y, wp.x, wp.y);
+    for (let d = 40; d < 250; d += 30) {
+      const px = this.player.x + Math.cos(angle) * d;
+      const py = this.player.y + Math.sin(angle) * d;
+      const slash = this.add.circle(px, py, 15, 0x9b59b6, 0.4).setDepth(10);
+      this.tweens.add({ targets: slash, alpha: 0, scale: 0.3, duration: 300, delay: d * 0.5, onComplete: () => slash.destroy() });
+    }
+    this.aoeDirectional(this.player.x, this.player.y, angle, 250, 0.3, 75);
+  }
+
+  private abilityVoidAnchor(): void {
+    // Place an anchor; reactivate to teleport back
+    const ax = this.player.x, ay = this.player.y;
+    const anchor = this.add.circle(ax, ay, 12, 0x6a0dad, 0.6).setDepth(10);
+    this.tweens.add({ targets: anchor, alpha: 0.3, yoyo: true, repeat: -1, duration: 500 });
+    this.time.delayedCall(5000, () => {
+      if (!anchor.active) return;
+      this.player.setPosition(ax, ay); anchor.destroy();
+      const flash = this.add.circle(ax, ay, 30, 0x9b59b6, 0.5).setDepth(10);
+      this.tweens.add({ targets: flash, scale: 2, alpha: 0, duration: 300, onComplete: () => flash.destroy() });
+    });
+  }
+
+  private abilityGravityWell(): void {
+    const wp = this.cameras.main.getWorldPoint(this.pointer.x, this.pointer.y);
+    const well = this.add.circle(wp.x, wp.y, 30, 0x333366, 0.7).setDepth(10);
+    const timer = this.time.addEvent({ delay: 100, repeat: 29, callback: () => {
+      this.enemies.getChildren().forEach(obj => {
+        const e = obj as Phaser.Physics.Arcade.Sprite;
+        const d = Phaser.Math.Distance.Between(wp.x, wp.y, e.x, e.y);
+        if (d < 120) {
+          const ang = Phaser.Math.Angle.Between(e.x, e.y, wp.x, wp.y);
+          (e.body as Phaser.Physics.Arcade.Body).setVelocity(Math.cos(ang) * 120, Math.sin(ang) * 120);
+        }
+      });
+    }});
+    this.time.delayedCall(3000, () => { well.destroy(); timer.remove(); this.aoeHit(wp.x, wp.y, 80, 40); });
+  }
+
+  private abilityTemporalRewind(): void {
+    // Reset HP to 70%, teleport back to center
+    this.hp = Math.max(this.hp, Math.floor(this.maxHp * 0.7));
+    this.player.setPosition(WORLD_WIDTH / 2, WORLD_HEIGHT / 2);
+    const ripple = this.add.circle(this.player.x, this.player.y, 40, 0x00bfff, 0.5).setDepth(10);
+    this.tweens.add({ targets: ripple, scale: 3, alpha: 0, duration: 500, onComplete: () => ripple.destroy() });
+  }
+
+  private abilityAssassinate(): void {
+    const nearest = this.findNearestEnemy();
+    if (!nearest) return;
+    // Teleport behind + massive damage
+    const behindAngle = Phaser.Math.Angle.Between(this.player.x, this.player.y, nearest.x, nearest.y);
+    this.player.setPosition(nearest.x + Math.cos(behindAngle) * 30, nearest.y + Math.sin(behindAngle) * 30);
+    const d = nearest.getData('d') as EnemyData;
+    if (d && d.hp > 0) this.damageEnemy(nearest, d, 120, this.time.now, { x: this.player.x, y: this.player.y });
+    this.cameras.main.shake(80, 0.006);
+  }
+
+  private abilityMirrorDimension(): void {
+    // Clone player; clone mimics attacks for 5s
+    const clone = this.add.circle(this.player.x + 40, this.player.y, PLAYER_RADIUS, 0x9b59b6, 0.6).setDepth(10);
+    const timer = this.time.addEvent({ delay: 800, repeat: 5, callback: () => {
+      this.aoeHit(clone.x, clone.y, 60, 25);
+      const slash = this.add.circle(clone.x, clone.y, 60, 0x9b59b6, 0.2).setDepth(5);
+      this.tweens.add({ targets: slash, alpha: 0, duration: 300, onComplete: () => slash.destroy() });
+      clone.setPosition(this.player.x + 40, this.player.y);
+    }});
+    this.time.delayedCall(5000, () => { clone.destroy(); timer.remove(); });
+  }
+
+  private abilityRealityShatter(): void {
+    // Ultimate: screen-wide damage burst
+    const shatter = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x9b59b6, 0.3)
+      .setDepth(20).setScrollFactor(0);
+    this.tweens.add({ targets: shatter, alpha: 0, duration: 600, onComplete: () => shatter.destroy() });
+    this.enemies.getChildren().forEach(obj => {
+      const e = obj as Phaser.Physics.Arcade.Sprite;
+      const d = e.getData('d') as EnemyData;
+      if (d && d.hp > 0) this.damageEnemy(e, d, 80, this.time.now, { x: this.player.x, y: this.player.y });
+    });
+    this.cameras.main.shake(300, 0.02);
+  }
+
+  // ── Trickster extra abilities ──
+
+  private abilityPoisonFlask(): void {
+    const wp = this.cameras.main.getWorldPoint(this.pointer.x, this.pointer.y);
+    const cloud = this.add.circle(wp.x, wp.y, 50, 0x2ecc71, 0.3).setDepth(5);
+    const timer = this.time.addEvent({ delay: 500, repeat: 7, callback: () => {
+      this.aoeHit(wp.x, wp.y, 50, 12);
+      cloud.setAlpha(0.1 + Math.random() * 0.2);
+    }});
+    this.time.delayedCall(4000, () => { cloud.destroy(); timer.remove(); });
+  }
+
+  private abilityCardTrick(): void {
+    // Fire 5 cards in a fan
+    const wp = this.cameras.main.getWorldPoint(this.pointer.x, this.pointer.y);
+    const baseAngle = Phaser.Math.Angle.Between(this.player.x, this.player.y, wp.x, wp.y);
+    for (let i = -2; i <= 2; i++) {
+      const ang = baseAngle + i * 0.2;
+      const card = this.physics.add.sprite(this.player.x, this.player.y, 'player');
+      card.setTint(0xf39c12); card.setScale(0.5); card.setData('damage', 22);
+      this.rainArrows.add(card);
+      (card.body as Phaser.Physics.Arcade.Body).setVelocity(Math.cos(ang) * 380, Math.sin(ang) * 380);
+      this.tweens.add({ targets: card, rotation: card.rotation + Math.PI * 6, duration: 800 });
+      this.time.delayedCall(1000, () => { if (card.active) card.destroy(); });
+    }
+  }
+
+  private abilityVanish(): void {
+    this.player.setAlpha(0.1);
+    (this.player.body as Phaser.Physics.Arcade.Body).checkCollision.none = true;
+    const poof = this.add.circle(this.player.x, this.player.y, 30, 0x666666, 0.5).setDepth(5);
+    this.tweens.add({ targets: poof, scale: 2, alpha: 0, duration: 400, onComplete: () => poof.destroy() });
+    this.time.delayedCall(3500, () => {
+      this.player.setAlpha(1);
+      (this.player.body as Phaser.Physics.Arcade.Body).checkCollision.none = false;
+      // Reappear with backstab damage
+      this.aoeHit(this.player.x, this.player.y, 60, 50);
+    });
+  }
+
+  private abilityExplosiveConfetti(): void {
+    for (let i = 0; i < 12; i++) {
+      const ang = Math.random() * Math.PI * 2;
+      const dist = 40 + Math.random() * 60;
+      const cx = this.player.x + Math.cos(ang) * dist;
+      const cy = this.player.y + Math.sin(ang) * dist;
+      const colors = [0xff0000, 0x00ff00, 0x0000ff, 0xffff00, 0xff00ff];
+      const confetti = this.add.circle(cx, cy, 5, colors[i % 5], 0.8).setDepth(10);
+      this.tweens.add({ targets: confetti, y: cy - 30, alpha: 0, duration: 600, delay: i * 50, onComplete: () => confetti.destroy() });
+    }
+    this.aoeHit(this.player.x, this.player.y, 100, 45);
+    this.cameras.main.shake(80, 0.005);
+  }
+
+  private abilityKnifeRain(): void {
+    const wp = this.cameras.main.getWorldPoint(this.pointer.x, this.pointer.y);
+    for (let i = 0; i < 8; i++) {
+      this.time.delayedCall(i * 100, () => {
+        const kx = wp.x + (Math.random() - 0.5) * 80;
+        const ky = wp.y + (Math.random() - 0.5) * 80;
+        const knife = this.add.rectangle(kx, ky - 40, 3, 12, 0xcccccc, 0.9).setDepth(10);
+        this.tweens.add({ targets: knife, y: ky, alpha: 0, duration: 200, onComplete: () => knife.destroy() });
+      });
+    }
+    this.time.delayedCall(900, () => this.aoeHit(wp.x, wp.y, 60, 50));
+  }
+
+  private abilityGrandFinale(): void {
+    // Massive explosion after buildup
+    const buildup = this.add.circle(this.player.x, this.player.y, 20, 0xf39c12, 0.3).setDepth(10);
+    this.tweens.add({ targets: buildup, scale: 6, alpha: 0.6, duration: 1000, onComplete: () => {
+      buildup.destroy();
+      this.aoeHit(this.player.x, this.player.y, 180, 100);
+      const boom = this.add.circle(this.player.x, this.player.y, 180, 0xf39c12, 0.5).setDepth(10);
+      this.tweens.add({ targets: boom, scale: 1.5, alpha: 0, duration: 500, onComplete: () => boom.destroy() });
+      this.cameras.main.shake(300, 0.02);
+    }});
+  }
+
+  private abilitySwap(): void {
+    const nearest = this.findNearestEnemy();
+    if (!nearest) return;
+    const px = this.player.x, py = this.player.y;
+    this.player.setPosition(nearest.x, nearest.y);
+    nearest.setPosition(px, py);
+    const flash1 = this.add.circle(this.player.x, this.player.y, 20, 0xf39c12, 0.5).setDepth(10);
+    const flash2 = this.add.circle(nearest.x, nearest.y, 20, 0xf39c12, 0.5).setDepth(10);
+    this.tweens.add({ targets: [flash1, flash2], alpha: 0, scale: 2, duration: 300, onComplete: () => { flash1.destroy(); flash2.destroy(); }});
+  }
+
+  private abilityPuppetShow(): void {
+    // Confuse nearby enemies — make them fight each other (damage each other)
+    this.enemies.getChildren().forEach(obj => {
+      const e = obj as Phaser.Physics.Arcade.Sprite;
+      if (Phaser.Math.Distance.Between(this.player.x, this.player.y, e.x, e.y) < 120) {
+        e.setTint(0xff00ff);
+        const d = e.getData('d') as EnemyData;
+        if (d && d.hp > 0) this.damageEnemy(e, d, 30, this.time.now, { x: e.x, y: e.y });
+        this.time.delayedCall(3000, () => { if (e.active) e.clearTint(); });
+      }
+    });
+  }
+
+  private abilityLuckyCoin(): void {
+    // Random effect: heal, damage, or gold
+    const roll = Math.random();
+    const coin = this.add.text(this.player.x, this.player.y - 20, '🪙', { fontSize: '24px' }).setOrigin(0.5).setDepth(20);
+    this.tweens.add({ targets: coin, y: coin.y - 40, alpha: 0, duration: 800, onComplete: () => coin.destroy() });
+    if (roll < 0.33) {
+      this.hp = Math.min(this.maxHp, this.hp + 60);
+    } else if (roll < 0.66) {
+      this.aoeHit(this.player.x, this.player.y, 120, 70);
+    } else {
+      this.gold += 25;
+    }
+  }
+
+  private abilityHallOfMirrors(): void {
+    // 4 decoys that explode after 3s
+    for (let i = 0; i < 4; i++) {
+      const ang = (Math.PI * 2 / 4) * i;
+      const dx = this.player.x + Math.cos(ang) * 60;
+      const dy = this.player.y + Math.sin(ang) * 60;
+      const decoy = this.add.circle(dx, dy, PLAYER_RADIUS, this.classDef.color, 0.5).setDepth(10);
+      this.time.delayedCall(3000, () => {
+        if (!decoy.active) return;
+        this.aoeHit(decoy.x, decoy.y, 50, 35);
+        const boom = this.add.circle(decoy.x, decoy.y, 50, 0xf39c12, 0.4).setDepth(10);
+        this.tweens.add({ targets: boom, scale: 1.5, alpha: 0, duration: 300, onComplete: () => boom.destroy() });
+        decoy.destroy();
+      });
+    }
+  }
+
+  private abilityChaosRoulette(): void {
+    // Random ability effect from pool
+    const effects = ['aoe', 'heal', 'speed', 'clones'];
+    const pick = effects[Math.floor(Math.random() * effects.length)];
+    const label = this.add.text(this.player.x, this.player.y - 30, `🎰 ${pick.toUpperCase()}!`, {
+      fontFamily: '"Cinzel", serif', fontSize: '14px', color: '#f39c12', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(20);
+    this.tweens.add({ targets: label, y: label.y - 30, alpha: 0, duration: 1200, onComplete: () => label.destroy() });
+    switch (pick) {
+      case 'aoe': this.aoeHit(this.player.x, this.player.y, 130, 60); break;
+      case 'heal': this.hp = Math.min(this.maxHp, this.hp + 80); break;
+      case 'speed': {
+        const orig = this.attackConfig.attackCooldownMs;
+        this.attackConfig.attackCooldownMs = Math.floor(orig * 0.3);
+        this.time.delayedCall(4000, () => { this.attackConfig.attackCooldownMs = orig; });
+        break;
+      }
+      case 'clones': {
+        for (let i = 0; i < 3; i++) {
+          const c = this.add.circle(this.player.x + (Math.random() - 0.5) * 80, this.player.y + (Math.random() - 0.5) * 80, PLAYER_RADIUS, 0xf39c12, 0.5).setDepth(10);
+          this.time.delayedCall(2000, () => { this.aoeHit(c.x, c.y, 40, 25); c.destroy(); });
+        }
+        break;
+      }
+    }
+  }
+
+  private abilityCurtainCall(): void {
+    // Ultimate: stage lights + massive damage to all
+    const dimBg = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.6)
+      .setDepth(18).setScrollFactor(0);
+    const spotlight = this.add.circle(this.player.x, this.player.y, 100, 0xf39c12, 0.3).setDepth(19);
+    this.tweens.add({ targets: spotlight, scale: 3, alpha: 0, duration: 1500 });
+    this.time.delayedCall(1000, () => {
+      this.enemies.getChildren().forEach(obj => {
+        const e = obj as Phaser.Physics.Arcade.Sprite;
+        const d = e.getData('d') as EnemyData;
+        if (d && d.hp > 0) this.damageEnemy(e, d, 90, this.time.now, { x: this.player.x, y: this.player.y });
+      });
+      this.cameras.main.shake(300, 0.015);
+    });
+    this.time.delayedCall(2000, () => { dimBg.destroy(); spotlight.destroy(); });
+  }
+
+  // ── Utility helpers ──
+
+  private aoeHit(cx: number, cy: number, radius: number, damage: number): void {
+    this.enemies.getChildren().forEach(obj => {
+      const e = obj as Phaser.Physics.Arcade.Sprite;
+      const d = e.getData('d') as EnemyData;
+      if (!d || d.hp <= 0) return;
+      if (Phaser.Math.Distance.Between(cx, cy, e.x, e.y) <= radius) {
+        this.damageEnemy(e, d, damage, this.time.now, { x: cx, y: cy });
+      }
+    });
+  }
+
+  private aoeDirectional(ox: number, oy: number, angle: number, range: number, halfAngle: number, damage: number): void {
+    this.enemies.getChildren().forEach(obj => {
+      const e = obj as Phaser.Physics.Arcade.Sprite;
+      const d = e.getData('d') as EnemyData;
+      if (!d || d.hp <= 0) return;
+      const dist = Phaser.Math.Distance.Between(ox, oy, e.x, e.y);
+      if (dist > range) return;
+      const eAngle = Phaser.Math.Angle.Between(ox, oy, e.x, e.y);
+      let diff = Math.abs(eAngle - angle); if (diff > Math.PI) diff = 2 * Math.PI - diff;
+      if (diff <= halfAngle) this.damageEnemy(e, d, damage, this.time.now, { x: ox, y: oy });
+    });
+  }
+
+  private findNearestEnemy(): Phaser.Physics.Arcade.Sprite | null {
+    let nearest: Phaser.Physics.Arcade.Sprite | null = null;
+    let minDist = Infinity;
+    this.enemies.getChildren().forEach(obj => {
+      const e = obj as Phaser.Physics.Arcade.Sprite;
+      const d = e.getData('d') as EnemyData;
+      if (!d || d.hp <= 0) return;
+      const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, e.x, e.y);
+      if (dist < minDist) { minDist = dist; nearest = e; }
+    });
+    return nearest;
+  }
+
   // ── Collisions ──
 
   private onArrowHitEnemy(arrowObj: Phaser.GameObjects.GameObject, enemyObj: Phaser.GameObjects.GameObject): void {
@@ -1280,8 +2188,10 @@ export class GameScene extends Phaser.Scene {
 
   private showPauseMenu(canExit: boolean): void {
     if (this.pauseOverlay) return; // already showing
+    this.paused = true;
 
-    this.scene.pause();
+    // Stop physics + HUD but keep input alive
+    this.physics.pause();
     this.scene.pause(SCENE_KEYS.hud);
 
     const container = this.add.container(0, 0).setDepth(500).setScrollFactor(0);
@@ -1323,8 +2233,6 @@ export class GameScene extends Phaser.Scene {
       const exitBtn = this.createPauseButton(container, GAME_WIDTH / 2, exitY, 'RETIRADA TÁTICA', '#c9a44e');
       exitBtn.on('pointerdown', () => {
         this.closePauseMenu();
-        this.scene.resume();
-        this.scene.resume(SCENE_KEYS.hud);
         this.exitWithRewards();
       });
 
@@ -1337,16 +2245,6 @@ export class GameScene extends Phaser.Scene {
     container.add(this.add.text(GAME_WIDTH / 2, py + ph - 16, 'ESC para voltar', {
       fontFamily: 'Inter, sans-serif', fontSize: '9px', color: '#3a3a3a',
     }).setOrigin(0.5).setScrollFactor(0));
-
-    // Listen for ESC to close
-    const escHandler = () => {
-      this.closePauseMenu();
-      this.input.keyboard!.off('keydown-ESC', escHandler);
-    };
-    // Need small delay so the current ESC keydown doesn't immediately close
-    this.time.delayedCall(100, () => {
-      this.input.keyboard!.on('keydown-ESC', escHandler);
-    });
   }
 
   private createPauseButton(container: Phaser.GameObjects.Container, x: number, y: number, label: string, color: string): Phaser.GameObjects.Zone {
@@ -1389,7 +2287,8 @@ export class GameScene extends Phaser.Scene {
       this.pauseOverlay.destroy();
       this.pauseOverlay = null;
     }
-    this.scene.resume();
+    this.paused = false;
+    this.physics.resume();
     this.scene.resume(SCENE_KEYS.hud);
   }
 
