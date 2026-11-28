@@ -169,6 +169,13 @@ export class GameScene extends Phaser.Scene {
   private maxHp = PLAYER_MAX_HP;
   private alive = true;
   private paused = false;
+  // Dungeon mode state
+  private dungeonMode = false;
+  private dungeonRoom: any = null;
+  private dungeonState: any = null;
+  private dungeonSessionGold = 0;
+  private dungeonSessionXp = 0;
+  private dungeonSessionKills = 0;
   private quiver: QuiverState = createQuiver();
   private abilities: AbilityState[] = [];
   private classId: ClassId = 'hunter';
@@ -198,10 +205,25 @@ export class GameScene extends Phaser.Scene {
     super(SCENE_KEYS.game);
   }
 
-  init(data?: { classId?: ClassId }): void {
+  init(data?: {
+    classId?: ClassId;
+    dungeonMode?: boolean;
+    dungeonRoom?: any;
+    dungeon?: any;
+    sessionGold?: number;
+    sessionXp?: number;
+    sessionKills?: number;
+  }): void {
     this.classId = data?.classId ?? 'hunter';
     this.classDef = ALL_CLASSES[this.classId];
     this.attackConfig = getBasicAttackConfig(this.classId);
+    // Dungeon mode data
+    this.dungeonMode = data?.dungeonMode ?? false;
+    this.dungeonRoom = data?.dungeonRoom ?? null;
+    this.dungeonState = data?.dungeon ?? null;
+    this.dungeonSessionGold = data?.sessionGold ?? 0;
+    this.dungeonSessionXp = data?.sessionXp ?? 0;
+    this.dungeonSessionKills = data?.sessionKills ?? 0;
   }
 
   create(): void {
@@ -1892,6 +1914,156 @@ export class GameScene extends Phaser.Scene {
     return nearest;
   }
 
+  // ── Dungeon-specific methods ──
+
+  private spawnDungeonEnemy(type: EnemyType, isBoss: boolean): void {
+    const floor = this.dungeonState?.floor ?? 1;
+    this.spawnEnemy(type);
+    // Apply floor scaling to the last spawned enemy
+    if (isBoss || floor > 1) {
+      const children = this.enemies.getChildren();
+      const last = children[children.length - 1] as Phaser.Physics.Arcade.Sprite;
+      if (last) {
+        const data = last.getData('d') as EnemyData;
+        if (data) {
+          const hpMult = isBoss ? 5 + floor : 1 + floor * 0.3;
+          const dmgMult = isBoss ? 2 + floor * 0.5 : 1 + floor * 0.2;
+          data.maxHp = Math.floor(data.maxHp * hpMult);
+          data.hp = data.maxHp;
+          data.damage = Math.floor(data.damage * dmgMult);
+          if (isBoss) {
+            last.setScale(1.8);
+            last.setTint(0x9b59b6);
+          }
+        }
+      }
+    }
+  }
+
+  private dungeonRoomCleared(): void {
+    if (!this.dungeonState || !this.dungeonRoom) return;
+
+    // Collect rewards
+    const reward = this.dungeonRoom.reward;
+    const earnedGold = reward?.gold ?? 0;
+    const earnedXp = reward?.xp ?? 0;
+    this.dungeonSessionGold += this.gold + earnedGold;
+    this.dungeonSessionXp += earnedXp;
+    this.dungeonSessionKills += this.kills;
+
+    const isBossRoom = this.dungeonRoom.type === 'boss';
+
+    // Show cleared message
+    const label = isBossRoom ? '🏆 BOSS DERROTADO!' : '✨ SALA LIMPA!';
+    const color = isBossRoom ? '#ffd700' : '#2ecc71';
+    const txt = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, label, {
+      fontFamily: '"Cinzel", serif', fontSize: '28px', color, fontStyle: 'bold',
+      stroke: '#000000', strokeThickness: 4,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(50);
+
+    if (earnedGold > 0 || earnedXp > 0) {
+      this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 35, `+${earnedGold} 🪙  +${earnedXp} XP`, {
+        fontFamily: 'Inter, sans-serif', fontSize: '14px', color: '#c9a44e',
+        stroke: '#000000', strokeThickness: 2,
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(50);
+    }
+
+    this.cameras.main.flash(300, 46, 204, 113);
+
+    this.time.delayedCall(2000, () => {
+      if (isBossRoom) {
+        // Dungeon complete! Save run and show summary
+        this.dungeonComplete();
+      } else {
+        // Return to dungeon map
+        this.scene.stop(SCENE_KEYS.hud);
+        this.scene.start(SCENE_KEYS.dungeonMap, {
+          classId: this.classId,
+          dungeon: this.dungeonState,
+          profile: getStoredProfile(),
+          sessionGold: this.dungeonSessionGold,
+          sessionXp: this.dungeonSessionXp,
+          sessionKills: this.dungeonSessionKills,
+          clearedRoomId: this.dungeonRoom.id,
+        });
+      }
+    });
+  }
+
+  private dungeonComplete(): void {
+    // Save full dungeon run to server
+    const totalWaves = this.dungeonState?.rooms?.length ?? 1;
+    saveRun(totalWaves, this.dungeonSessionKills, this.dungeonSessionGold, this.classId).then(result => {
+      this.showDungeonCompleteUI(result);
+    }).catch(() => {
+      this.showDungeonCompleteUI(null);
+    });
+  }
+
+  private showDungeonCompleteUI(result: RunResult | null): void {
+    const overlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.8)
+      .setScrollFactor(0).setDepth(100);
+    overlay.setAlpha(0);
+    this.tweens.add({ targets: overlay, alpha: 1, duration: 400 });
+
+    this.time.delayedCall(400, () => {
+      this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 100, '🏆 DUNGEON COMPLETA!', {
+        fontFamily: '"Cinzel", serif', fontSize: '32px', color: '#ffd700', fontStyle: 'bold',
+        stroke: '#000000', strokeThickness: 5,
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
+
+      this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 55, `Andar ${this.dungeonState?.floor ?? 1}`, {
+        fontFamily: '"Cinzel", serif', fontSize: '16px', color: '#c9a44e',
+        stroke: '#000000', strokeThickness: 3,
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
+
+      this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 20, [
+        `💀 ${this.dungeonSessionKills} kills`,
+        `🪙 ${this.dungeonSessionGold} ouro`,
+      ].join('  ·  '), {
+        fontFamily: '"Cinzel", serif', fontSize: '16px', color: '#d4d4d8',
+        stroke: '#000000', strokeThickness: 3,
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
+
+      if (result) {
+        this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 15, `+${result.xpEarned} XP  ·  +${result.goldEarned} ouro`, {
+          fontFamily: '"Cinzel", serif', fontSize: '14px', color: '#c9a44e',
+          stroke: '#000000', strokeThickness: 3,
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
+
+        const masteryLine = result.masteryUps > 0
+          ? `⭐ Maestria ${result.newMastery} (+${result.masteryUps}!)`
+          : `⭐ Maestria ${result.newMastery}`;
+        this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 40, masteryLine, {
+          fontFamily: '"Cinzel", serif', fontSize: '13px',
+          color: result.masteryUps > 0 ? '#ffd700' : '#c9a44e',
+          stroke: '#000000', strokeThickness: 3,
+          fontStyle: result.masteryUps > 0 ? 'bold' : 'normal',
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
+
+        // Mastery XP bar
+        const barW = 180, barH = 6;
+        const barX = GAME_WIDTH / 2 - barW / 2, barY = GAME_HEIGHT / 2 + 60;
+        const barBg = this.add.graphics().setScrollFactor(0).setDepth(101);
+        barBg.fillStyle(0x333333);
+        barBg.fillRoundedRect(barX, barY, barW, barH, 3);
+        const frac = result.nextMasteryXp > 0 ? result.currentClassXp / result.nextMasteryXp : 0;
+        barBg.fillStyle(0xc9a44e);
+        barBg.fillRoundedRect(barX, barY, barW * Math.min(1, frac), barH, 3);
+      }
+
+      const btn = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 100, '[ MENU ]', {
+        fontFamily: '"Cinzel", serif', fontSize: '22px', color: '#c9a44e', fontStyle: 'bold',
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(101).setInteractive({ useHandCursor: true });
+      btn.on('pointerdown', () => {
+        this.scene.stop(SCENE_KEYS.hud);
+        this.scene.start(SCENE_KEYS.mainMenu, { profile: getStoredProfile() });
+      });
+      btn.on('pointerover', () => btn.setColor('#f5e6a3'));
+      btn.on('pointerout', () => btn.setColor('#c9a44e'));
+    });
+  }
+
   // ── Collisions ──
 
   private onArrowHitEnemy(arrowObj: Phaser.GameObjects.GameObject, enemyObj: Phaser.GameObjects.GameObject): void {
@@ -2046,19 +2218,36 @@ export class GameScene extends Phaser.Scene {
     // Check wave clear
     if (this.enemiesAlive <= 0 && this.waveActive) {
       this.waveActive = false;
-      // Wave clear celebration
-      const clearTxt = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, '✨ ONDA CONCLUÍDA!', {
-        fontFamily: '"Cinzel", serif', fontSize: '28px', color: '#2ecc71', fontStyle: 'bold',
-        stroke: '#000000', strokeThickness: 4,
-      }).setOrigin(0.5).setScrollFactor(0).setDepth(50).setScale(0.5);
-      this.tweens.add({
-        targets: clearTxt, scale: 1.2, duration: 400, ease: 'Back.easeOut',
-        onComplete: () => {
-          this.tweens.add({ targets: clearTxt, alpha: 0, y: clearTxt.y - 20, duration: 800, delay: 600, onComplete: () => clearTxt.destroy() });
-        },
-      });
-      this.cameras.main.flash(200, 46, 204, 113);
-      this.time.delayedCall(2500, () => this.startNextWave());
+
+      if (this.dungeonMode) {
+        // Dungeon: room cleared
+        const clearTxt = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, '✨ SALA LIMPA!', {
+          fontFamily: '"Cinzel", serif', fontSize: '28px', color: '#2ecc71', fontStyle: 'bold',
+          stroke: '#000000', strokeThickness: 4,
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(50).setScale(0.5);
+        this.tweens.add({
+          targets: clearTxt, scale: 1.2, duration: 400, ease: 'Back.easeOut',
+          onComplete: () => {
+            this.tweens.add({ targets: clearTxt, alpha: 0, y: clearTxt.y - 20, duration: 800, delay: 600, onComplete: () => clearTxt.destroy() });
+          },
+        });
+        this.cameras.main.flash(200, 46, 204, 113);
+        this.time.delayedCall(2000, () => this.dungeonRoomCleared());
+      } else {
+        // Arena: wave clear celebration
+        const clearTxt = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, '✨ ONDA CONCLUÍDA!', {
+          fontFamily: '"Cinzel", serif', fontSize: '28px', color: '#2ecc71', fontStyle: 'bold',
+          stroke: '#000000', strokeThickness: 4,
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(50).setScale(0.5);
+        this.tweens.add({
+          targets: clearTxt, scale: 1.2, duration: 400, ease: 'Back.easeOut',
+          onComplete: () => {
+            this.tweens.add({ targets: clearTxt, alpha: 0, y: clearTxt.y - 20, duration: 800, delay: 600, onComplete: () => clearTxt.destroy() });
+          },
+        });
+        this.cameras.main.flash(200, 46, 204, 113);
+        this.time.delayedCall(2500, () => this.startNextWave());
+      }
     }
   }
 
@@ -2098,6 +2287,45 @@ export class GameScene extends Phaser.Scene {
 
   private startNextWave(): void {
     if (!this.alive) return;
+
+    // ── Dungeon mode: single encounter per room ──
+    if (this.dungeonMode && this.dungeonRoom) {
+      if (this.wave > 0) {
+        // Room already cleared — return to dungeon map
+        this.dungeonRoomCleared();
+        return;
+      }
+      this.wave = 1;
+      this.waveActive = true;
+
+      const roomType = this.dungeonRoom.type;
+      const enemyCount = this.dungeonRoom.enemies ?? 5;
+
+      // Announcement
+      const roomLabel = roomType === 'boss' ? '👹 BOSS!' : roomType === 'elite' ? '💀 ELITE' : `⚔️ ${enemyCount} Inimigos`;
+      const txt = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 50, roomLabel, {
+        fontFamily: '"Cinzel", serif', fontSize: '32px',
+        color: roomType === 'boss' ? '#9b59b6' : roomType === 'elite' ? '#f39c12' : '#c9a44e',
+        fontStyle: 'bold', stroke: '#000000', strokeThickness: 4,
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(50);
+      this.tweens.add({ targets: txt, alpha: 0, y: txt.y - 30, duration: 1500, delay: 800, onComplete: () => txt.destroy() });
+
+      // Spawn enemies for this room
+      let delay = 0;
+      if (roomType === 'boss') {
+        // Boss: 1 brute with extra HP (handled via enemy scaling below)
+        this.time.delayedCall(delay, () => this.spawnDungeonEnemy('brute', true));
+      } else {
+        for (let i = 0; i < enemyCount; i++) {
+          const type = roomType === 'elite' || (i === enemyCount - 1 && enemyCount > 3) ? 'brute' : 'grunt';
+          this.time.delayedCall(delay, () => this.spawnDungeonEnemy(type, false));
+          delay += 300;
+        }
+      }
+      return;
+    }
+
+    // ── Arena mode: infinite waves ──
     this.wave++;
     this.waveActive = true;
     const config = buildWave(this.wave);
@@ -2230,13 +2458,19 @@ export class GameScene extends Phaser.Scene {
     if (canExit) {
       // Exit with rewards button
       const exitY = py + 145;
-      const exitBtn = this.createPauseButton(container, GAME_WIDTH / 2, exitY, 'RETIRADA TÁTICA', '#c9a44e');
+      const exitLabel = this.dungeonMode ? 'VOLTAR AO MAPA' : 'RETIRADA TÁTICA';
+      const exitBtn = this.createPauseButton(container, GAME_WIDTH / 2, exitY, exitLabel, '#c9a44e');
       exitBtn.on('pointerdown', () => {
         this.closePauseMenu();
-        this.exitWithRewards();
+        if (this.dungeonMode) {
+          this.exitDungeonToMap();
+        } else {
+          this.exitWithRewards();
+        }
       });
 
-      container.add(this.add.text(GAME_WIDTH / 2, exitY + 22, 'Salva XP, ouro e maestria', {
+      const exitDesc = this.dungeonMode ? 'Volta ao mapa sem limpar a sala' : 'Salva XP, ouro e maestria';
+      container.add(this.add.text(GAME_WIDTH / 2, exitY + 22, exitDesc, {
         fontFamily: 'Inter, sans-serif', fontSize: '9px', color: '#555',
       }).setOrigin(0.5).setScrollFactor(0));
     }
@@ -2451,6 +2685,23 @@ export class GameScene extends Phaser.Scene {
       });
       btn.on('pointerover', () => btn.setColor('#f5e6a3'));
       btn.on('pointerout', () => btn.setColor('#c9a44e'));
+    });
+  }
+
+  // Also handle ESC exit for dungeon mode — in dungeon the pause menu
+  // should offer "Voltar ao Mapa" instead of full exit
+  private exitDungeonToMap(): void {
+    this.alive = false;
+    this.dungeonSessionGold += this.gold;
+    this.dungeonSessionKills += this.kills;
+    this.scene.stop(SCENE_KEYS.hud);
+    this.scene.start(SCENE_KEYS.dungeonMap, {
+      classId: this.classId,
+      dungeon: this.dungeonState,
+      profile: getStoredProfile(),
+      sessionGold: this.dungeonSessionGold,
+      sessionXp: this.dungeonSessionXp,
+      sessionKills: this.dungeonSessionKills,
     });
   }
 }
