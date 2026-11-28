@@ -121,6 +121,16 @@ export class TalentTreeScene extends Phaser.Scene {
     const progress = this.profile?.classProgress[this.selectedClass];
     const unlocked = new Set(progress?.unlockedAbilities ?? []);
     const equipped = new Set(progress?.equippedAbilities ?? []);
+
+    // Ensure default starters are always shown as unlocked
+    const STARTERS: Record<string, string[]> = {
+      hunter: ['hnt_rain_arrows', 'hnt_agile_retreat', 'hnt_eagle_eye', 'hnt_arrow_storm', 'hnt_piercing_arrow'],
+      berserker: ['bsk_axe_throw', 'bsk_war_cry', 'bsk_bloodlust', 'bsk_fury_slam', 'bsk_cleave'],
+      runekeeper: ['rk_frost_rune', 'rk_fire_rune', 'rk_summon_golem', 'rk_rune_shield', 'rk_arcane_bolt'],
+      riftblade: ['rb_blink_strike', 'rb_void_mark', 'rb_phase_shift', 'rb_spatial_rift', 'rb_shadow_blade'],
+      trickster: ['tk_juggle', 'tk_smoke_mirror', 'tk_card_trick', 'tk_vanish', 'tk_poison_flask'],
+    };
+    for (const id of (STARTERS[this.selectedClass] ?? [])) unlocked.add(id);
     const branches = ['core', 'offensive', 'utility', 'advanced'] as const;
 
     const branchStartX = 50;
