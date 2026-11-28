@@ -176,6 +176,10 @@ export class GameScene extends Phaser.Scene {
   private dungeonSessionGold = 0;
   private dungeonSessionXp = 0;
   private dungeonSessionKills = 0;
+  // Arena continuous spawn state
+  private arenaSpawnTimer = 0;
+  private arenaSpawnInterval = 2000;
+  private arenaEliteChance = 0.05;
   private quiver: QuiverState = createQuiver();
   private abilities: AbilityState[] = [];
   private classId: ClassId = 'hunter';
@@ -330,13 +334,14 @@ export class GameScene extends Phaser.Scene {
         return;
       }
       if (!this.alive) return;
-      // Between waves: offer exit
-      if (!this.waveActive && this.wave > 0) {
+
+      if (this.dungeonMode) {
+        // Dungeon: always show pause with exit option
         this.showPauseMenu(true);
-        return;
+      } else {
+        // Arena: always show pause with exit (continuous mode, no wave breaks)
+        this.showPauseMenu(true);
       }
-      // During wave: pause menu
-      this.showPauseMenu(false);
     });
 
     // HUD
@@ -348,6 +353,9 @@ export class GameScene extends Phaser.Scene {
 
   update(time: number, _delta: number): void {
     if (!this.alive || this.paused) return;
+
+    // Arena continuous spawning
+    if (!this.dungeonMode) this.arenaSpawnTick(time);
 
     // Reload tick
     this.quiver = tickReload(this.quiver, time);
@@ -1993,7 +2001,7 @@ export class GameScene extends Phaser.Scene {
   private dungeonComplete(): void {
     // Save full dungeon run to server
     const totalWaves = this.dungeonState?.rooms?.length ?? 1;
-    saveRun(totalWaves, this.dungeonSessionKills, this.dungeonSessionGold, this.classId).then(result => {
+    saveRun(totalWaves, this.dungeonSessionKills, this.dungeonSessionGold, this.classId, 'dungeon').then(result => {
       this.showDungeonCompleteUI(result);
     }).catch(() => {
       this.showDungeonCompleteUI(null);
@@ -2215,39 +2223,21 @@ export class GameScene extends Phaser.Scene {
     data.hpBar.destroy();
     enemy.destroy();
 
-    // Check wave clear
-    if (this.enemiesAlive <= 0 && this.waveActive) {
+    // Check wave clear (dungeon only — arena is continuous)
+    if (this.enemiesAlive <= 0 && this.waveActive && this.dungeonMode) {
       this.waveActive = false;
-
-      if (this.dungeonMode) {
-        // Dungeon: room cleared
-        const clearTxt = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, '✨ SALA LIMPA!', {
-          fontFamily: '"Cinzel", serif', fontSize: '28px', color: '#2ecc71', fontStyle: 'bold',
-          stroke: '#000000', strokeThickness: 4,
-        }).setOrigin(0.5).setScrollFactor(0).setDepth(50).setScale(0.5);
-        this.tweens.add({
-          targets: clearTxt, scale: 1.2, duration: 400, ease: 'Back.easeOut',
-          onComplete: () => {
-            this.tweens.add({ targets: clearTxt, alpha: 0, y: clearTxt.y - 20, duration: 800, delay: 600, onComplete: () => clearTxt.destroy() });
-          },
-        });
-        this.cameras.main.flash(200, 46, 204, 113);
-        this.time.delayedCall(2000, () => this.dungeonRoomCleared());
-      } else {
-        // Arena: wave clear celebration
-        const clearTxt = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, '✨ ONDA CONCLUÍDA!', {
-          fontFamily: '"Cinzel", serif', fontSize: '28px', color: '#2ecc71', fontStyle: 'bold',
-          stroke: '#000000', strokeThickness: 4,
-        }).setOrigin(0.5).setScrollFactor(0).setDepth(50).setScale(0.5);
-        this.tweens.add({
-          targets: clearTxt, scale: 1.2, duration: 400, ease: 'Back.easeOut',
-          onComplete: () => {
-            this.tweens.add({ targets: clearTxt, alpha: 0, y: clearTxt.y - 20, duration: 800, delay: 600, onComplete: () => clearTxt.destroy() });
-          },
-        });
-        this.cameras.main.flash(200, 46, 204, 113);
-        this.time.delayedCall(2500, () => this.startNextWave());
-      }
+      const clearTxt = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, '✨ SALA LIMPA!', {
+        fontFamily: '"Cinzel", serif', fontSize: '28px', color: '#2ecc71', fontStyle: 'bold',
+        stroke: '#000000', strokeThickness: 4,
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(50).setScale(0.5);
+      this.tweens.add({
+        targets: clearTxt, scale: 1.2, duration: 400, ease: 'Back.easeOut',
+        onComplete: () => {
+          this.tweens.add({ targets: clearTxt, alpha: 0, y: clearTxt.y - 20, duration: 800, delay: 600, onComplete: () => clearTxt.destroy() });
+        },
+      });
+      this.cameras.main.flash(200, 46, 204, 113);
+      this.time.delayedCall(2000, () => this.dungeonRoomCleared());
     }
   }
 
@@ -2291,7 +2281,6 @@ export class GameScene extends Phaser.Scene {
     // ── Dungeon mode: single encounter per room ──
     if (this.dungeonMode && this.dungeonRoom) {
       if (this.wave > 0) {
-        // Room already cleared — return to dungeon map
         this.dungeonRoomCleared();
         return;
       }
@@ -2301,7 +2290,6 @@ export class GameScene extends Phaser.Scene {
       const roomType = this.dungeonRoom.type;
       const enemyCount = this.dungeonRoom.enemies ?? 5;
 
-      // Announcement
       const roomLabel = roomType === 'boss' ? '👹 BOSS!' : roomType === 'elite' ? '💀 ELITE' : `⚔️ ${enemyCount} Inimigos`;
       const txt = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 50, roomLabel, {
         fontFamily: '"Cinzel", serif', fontSize: '32px',
@@ -2310,10 +2298,8 @@ export class GameScene extends Phaser.Scene {
       }).setOrigin(0.5).setScrollFactor(0).setDepth(50);
       this.tweens.add({ targets: txt, alpha: 0, y: txt.y - 30, duration: 1500, delay: 800, onComplete: () => txt.destroy() });
 
-      // Spawn enemies for this room
       let delay = 0;
       if (roomType === 'boss') {
-        // Boss: 1 brute with extra HP (handled via enemy scaling below)
         this.time.delayedCall(delay, () => this.spawnDungeonEnemy('brute', true));
       } else {
         for (let i = 0; i < enemyCount; i++) {
@@ -2325,29 +2311,45 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    // ── Arena mode: infinite waves ──
-    this.wave++;
+    // ── Arena mode: continuous infinite spawn ──
+    // Enemies spawn every few seconds, getting harder over time
+    // No wave breaks — player can exit anytime via ESC
+    this.wave = 1;
     this.waveActive = true;
-    const config = buildWave(this.wave);
+    this.arenaSpawnTimer = 0;
+    this.arenaSpawnInterval = 2000; // Start: 1 enemy every 2s
+    this.arenaEliteChance = 0.05;   // 5% brute at start
 
-    // Announcement
-    const txt = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 50, `⚔️ Onda ${this.wave}`, {
-      fontFamily: '"Cinzel", serif', fontSize: '32px', color: '#c9a44e', fontStyle: 'bold',
+    const txt = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 50, '⚔️ ARENA — Sobreviva!', {
+      fontFamily: '"Cinzel", serif', fontSize: '28px', color: '#c9a44e', fontStyle: 'bold',
       stroke: '#000000', strokeThickness: 4,
     }).setOrigin(0.5).setScrollFactor(0).setDepth(50);
-    this.tweens.add({
-      targets: txt, alpha: 0, y: txt.y - 30, duration: 1500, delay: 800,
-      onComplete: () => txt.destroy(),
-    });
+    this.tweens.add({ targets: txt, alpha: 0, y: txt.y - 30, duration: 1500, delay: 800, onComplete: () => txt.destroy() });
 
-    // Spawn enemies staggered
-    let delay = 0;
-    for (const entry of config.enemies) {
-      for (let i = 0; i < entry.count; i++) {
-        this.time.delayedCall(delay, () => this.spawnEnemy(entry.type));
-        delay += 300;
-      }
+    // Spawn first batch
+    for (let i = 0; i < 3; i++) {
+      this.time.delayedCall(i * 400, () => this.spawnEnemy('grunt'));
     }
+  }
+
+  // Arena continuous spawning — called from update()
+  private arenaSpawnTick(time: number): void {
+    if (!this.waveActive || !this.alive || this.paused || this.dungeonMode) return;
+
+    if (time - this.arenaSpawnTimer < this.arenaSpawnInterval) return;
+    this.arenaSpawnTimer = time;
+
+    // Difficulty ramp: spawn faster + more elites over time
+    const minutesPlayed = time / 60000;
+    this.arenaSpawnInterval = Math.max(500, 2000 - minutesPlayed * 150); // down to 500ms
+    this.arenaEliteChance = Math.min(0.4, 0.05 + minutesPlayed * 0.03);  // up to 40%
+
+    // Spawn
+    const type: EnemyType = Math.random() < this.arenaEliteChance ? 'brute' : 'grunt';
+    this.spawnEnemy(type);
+
+    // Track "wave" as time bracket for XP calc
+    this.wave = Math.floor(minutesPlayed) + 1;
   }
 
   // ── Floor ──

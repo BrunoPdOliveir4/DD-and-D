@@ -15,7 +15,7 @@ export interface RunResult {
   profile: PlayerProfile | null;
 }
 
-export async function saveRun(wave: number, kills: number, gold: number, classId: string): Promise<RunResult> {
+export async function saveRun(wave: number, kills: number, gold: number, classId: string, gameMode: 'arena' | 'dungeon' = 'arena'): Promise<RunResult> {
   const token = getStoredToken();
   if (!token) throw new Error('Não autenticado');
 
@@ -25,7 +25,7 @@ export async function saveRun(wave: number, kills: number, gold: number, classId
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ wave, kills, gold, classId }),
+    body: JSON.stringify({ wave, kills, gold, classId, gameMode }),
   });
 
   if (!res.ok) {

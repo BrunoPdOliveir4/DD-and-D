@@ -23,11 +23,15 @@ router.post('/save-run', async (req, res) => {
     const playerId = getPlayerId(req);
     if (!playerId) { res.status(401).json({ error: 'Não autenticado' }); return; }
 
-    const { wave, kills, gold, classId } = req.body;
+    const { wave, kills, gold, classId, gameMode } = req.body;
     if (!wave || !classId) { res.status(400).json({ error: 'Dados incompletos' }); return; }
 
     const db = getDB();
-    const xpEarned = kills * 10 + wave * 25 + gold * 2;
+    // Dungeon gives 2× mastery XP, Arena gives more gold
+    const isDungeon = gameMode === 'dungeon';
+    const baseXp = kills * 10 + wave * 25 + gold * 2;
+    const xpEarned = isDungeon ? Math.floor(baseXp * 2) : baseXp;
+    const goldMultiplier = isDungeon ? 1 : 1.5; // Arena is a gold farm
 
     // Get current player first
     const player = await db.collection('players').findOne({ _id: new ObjectId(playerId) });
@@ -63,7 +67,7 @@ router.post('/save-run', async (req, res) => {
     const updateOps: any = {
       $inc: {
         xp: xpEarned,
-        gold: gold,
+        gold: Math.floor(gold * goldMultiplier),
       },
       $set: {
         [`classProgress.${classId}.xp`]: currentClassXp,
@@ -103,7 +107,7 @@ router.post('/save-run', async (req, res) => {
       classId,
       wave,
       kills,
-      goldEarned: gold,
+      goldEarned: Math.floor(gold * goldMultiplier),
       xpEarned,
       masteryUps,
       playedAt: new Date().toISOString(),
