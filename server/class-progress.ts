@@ -31,7 +31,8 @@ router.post('/unlock', async (req, res) => {
 
     const progress = player.classProgress?.[classId];
     if (!progress) { res.status(400).json({ error: 'Classe inválida' }); return; }
-    if (!progress.unlocked) { res.status(400).json({ error: 'Classe bloqueada' }); return; }
+    // All classes are unlocked — legacy accounts may lack the 'unlocked' field
+    // so we treat missing/undefined as unlocked
 
     // Cost scales by tier: T1=100, T2=250, T3=500
     const tierCosts: Record<number, number> = { 1: 100, 2: 250, 3: 500 };
